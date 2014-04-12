@@ -51,43 +51,115 @@ typedef struct
 		unsigned int v_total_len, 
 		const unsigned char *val, 
 		unsigned int v_len);
+	
+	/**
+	@param dict_key: Dictionary key for this item. This is set to null for list entries.
+	@param val: Integer value
+	@return 0 on error; 1 otherwise
+	**/
+	int (*dict_enter)(bencode_s *s, const char *dict_key);
+
+	/**
+	Called when we have finished processing a dictionary.
+	
+	@param dict_key: Dictionary key for this item. This is set to null for list entries.
+	@paramt val: Integer value (TODO: not in params. Update github repo? This is same with other callbacks in this struct.)
+	@return 0 on error; 1 otherwise
+	**/
+	int (*dict_leave)(bencode_t *s, const char *dict_key);
+
+	/**
+	@param dict_key: Dictionary key for this item. This is set to null for list entries.
+	@param val: Integer value
+	@return 0 on error; 1 otherwise.
+	**/
+	int (*list_enter)(bencode_t *s, const char *dict_key);
+
+	/**
+	@param dict_key: Dictionary key for this item. This is set to null for list entries.
+	@param val: Integer value.
+	@return 0 on error; 1 otherwise.
+	**/
+	int (*list_leave)(bencode_t *s, const char *dict_key);
+
+	/**
+	Called when we have just finished processing a list item.
+	@return 0 on error; 1 otherwise.
+	**/
+	int (*list_next)(bencode_t *s);
+
+	/**
+	Called when we have just finished processing a dict item.
+	@return 0 on error; 1 otherwise.
+	**/
+	int (*dict_next)(bencode_t *s);
+} bencode_callbacks_t;
+
+
+typedef struct
+{
+	// dictionary key
+	char *key;
+	int k_size;
+
+	// string value
+	char *strval;
+	int sv_size;
+
+	long int intval;
+	
+	int len;
+
+	int pos;
+
+	// token type
+	int type;
+
+	// user data for context specific to frame
+	void *udata;
+} bencode_frame_t;
+
+struct bencode_s
+{
+	// stack
+	bencode_frame_t *stk;
+
+	// number of frames we can push down, i.e. maximum depth
+	unsigned int nframes;
+
+	// current depth within stack
+	unsigned int d;
+
+	// user data for context
+	void *udata;
+
+	bencode_callbacks_t cb;
+
 }
 
+/**
+@param expected_depth: Expected depth pf bencode
+@param cb: Callbacks we need to parse the bencode
+@return new memory for bencode parser
+**/
+bencode_t *bencode_new(int expected_depth, bencode_callbacks_t *cb, void *udata);
+
+/**
+Initialise reader
+**/
+void bencode_init(bencode_t *);
+
+/**
+@param buf: Buffer to read new input from
+@param len: size of the buffer
+@return 0 on error; 1 otherwise
+**/
+int bencode_dispatch_from_buffer(bencode_t *, const char *buf, unsigned int len);
 
 
+/**
+@param cb: Callbacks we need to parse bencode.
+**/
+void bencode_set_callbacks(bencode_t *, bencode_callbacks_t *cb);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#endif
