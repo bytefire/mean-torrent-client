@@ -1,165 +1,141 @@
+
 #ifndef BENCODE_H_
 #define BENCODE_H_
-
-enum
-{
-	// init state
-	BENCODE_TOK_NONE,
-	// a list
-	BENCODE_TOK_LIST,
-	// length of dictionary key
-	BENCODE_TOK_DICT_KEYLEN,
-	// dictionary key
-	BENCODE_TOK_DICT_KEY,
-	// dictionary key value
-	BENCODE_TOK_DICT_VAL,
-	// integer
-	BENCODE_TOK_INT,
-	// length of string
-	BENCODE_TOK_STR_LEN,
-	// string
-	BENCODE_TOK_STR,
-	// dictionary
-	BENCODE_TOK_DICT
-};
-
-typedef struct bencode_s bencode_t;
+#pragma once
 
 typedef struct
 {
-	/**
-	@param dict_key: dictionary key for this item. This is set to null for list entries.
-	@param val: integer value
-	@return 0 on error; 1 otherise
-	**/
-
-	int (*hit_int)(bencode_t *s, const char *dict_key, const long int val);
-
-	/**
-	Call this when there is some string for us to read. This callback could fire multiple
-	times for large strings.
-
-	@param dict_key: the dictionary key for this item. this is set to null for list entries.
-	@param v_total_len: total length of the string
-	@param val: string value
-	@param v_len: lenght of string we are currently emitting.
-	@return 0 on error; 1 otherwise
-	**/
-	int (*hit_str)(
-		bencode_t *s, 
-		const char *dict_key, 
-		unsigned int v_total_len, 
-		const unsigned char *val, 
-		unsigned int v_len);
-	
-	/**
-	@param dict_key: Dictionary key for this item. This is set to null for list entries.
-	@param val: Integer value
-	@return 0 on error; 1 otherwise
-	**/
-	int (*dict_enter)(bencode_s *s, const char *dict_key);
-
-	/**
-	Called when we have finished processing a dictionary.
-	
-	@param dict_key: Dictionary key for this item. This is set to null for list entries.
-	@paramt val: Integer value (TODO: not in params. Update github repo? This is same with other callbacks in this struct.)
-	@return 0 on error; 1 otherwise
-	**/
-	int (*dict_leave)(bencode_t *s, const char *dict_key);
-
-	/**
-	@param dict_key: Dictionary key for this item. This is set to null for list entries.
-	@param val: Integer value
-	@return 0 on error; 1 otherwise.
-	**/
-	int (*list_enter)(bencode_t *s, const char *dict_key);
-
-	/**
-	@param dict_key: Dictionary key for this item. This is set to null for list entries.
-	@param val: Integer value.
-	@return 0 on error; 1 otherwise.
-	**/
-	int (*list_leave)(bencode_t *s, const char *dict_key);
-
-	/**
-	Called when we have just finished processing a list item.
-	@return 0 on error; 1 otherwise.
-	**/
-	int (*list_next)(bencode_t *s);
-
-	/**
-	Called when we have just finished processing a dict item.
-	@return 0 on error; 1 otherwise.
-	**/
-	int (*dict_next)(bencode_t *s);
-} bencode_callbacks_t;
-
-
-typedef struct
-{
-	// dictionary key
-	char *key;
-	int k_size;
-
-	// string value
-	char *strval;
-	int sv_size;
-
-	long int intval;
-	
-	int len;
-
-	int pos;
-
-	// token type
-	int type;
-
-	// user data for context specific to frame
-	void *udata;
-} bencode_frame_t;
-
-struct bencode_s
-{
-	// stack
-	bencode_frame_t *stk;
-
-	// number of frames we can push down, i.e. maximum depth
-	unsigned int nframes;
-
-	// current depth within stack
-	unsigned int d;
-
-	// user data for context
-	void *udata;
-
-	bencode_callbacks_t cb;
-
-}
+    const char *str;
+    const char *start;
+    void *parent;
+    int val;
+    int len;
+} bencode_t;
 
 /**
-@param expected_depth: Expected depth pf bencode
-@param cb: Callbacks we need to parse the bencode
-@return new memory for bencode parser
-**/
-bencode_t *bencode_new(int expected_depth, bencode_callbacks_t *cb, void *udata);
+* Initialise a bencode object.
+* @param be The bencode object
+* @param str Buffer we expect input from
+* @param len Length of buffer
+*/
+void bencode_init(
+    bencode_t * be,
+    const char *str,
+    int len
+);
 
 /**
-Initialise reader
-**/
-void bencode_init(bencode_t *);
+* @return 1 if the bencode object is an int; otherwise 0.
+*/
+int bencode_is_int(
+    const bencode_t * be
+);
 
 /**
-@param buf: Buffer to read new input from
-@param len: size of the buffer
-@return 0 on error; 1 otherwise
-**/
-int bencode_dispatch_from_buffer(bencode_t *, const char *buf, unsigned int len);
-
+* @return 1 if the bencode object is a string; otherwise 0.
+*/
+int bencode_is_string(
+    const bencode_t * be
+);
 
 /**
-@param cb: Callbacks we need to parse bencode.
-**/
-void bencode_set_callbacks(bencode_t *, bencode_callbacks_t *cb);
+* @return 1 if the bencode object is a list; otherwise 0.
+*/
+int bencode_is_list(
+    const bencode_t * be
+);
 
-#endif
+/**
+* @return 1 if the bencode object is a dict; otherwise 0.
+*/
+int bencode_is_dict(
+    const bencode_t * be
+);
+
+/**
+* Obtain value from integer bencode object.
+* @param val Long int we are writing the result to
+* @return 1 on success, otherwise 0
+*/
+int bencode_int_value(
+    bencode_t * be,
+    long int *val
+);
+
+/**
+* @return 1 if there is another item on this dict; otherwise 0.
+*/
+int bencode_dict_has_next(
+    bencode_t * be
+);
+
+/**
+* Get the next item within this dictionary.
+* @param be_item Next item.
+* @param key Const pointer to key string of next item.
+* @param klen Length of the key of next item.
+* @return 1 on success; otherwise 0.
+*/
+int bencode_dict_get_next(
+    bencode_t * be,
+    bencode_t * be_item,
+    const char **key,
+    int *klen
+);
+
+/**
+* Get the string value from this bencode object.
+* The buffer returned is stored on the stack.
+* @param be The bencode object.
+* @param str Const pointer to the buffer.
+* @param slen Length of the buffer we are outputting.
+* @return 1 on success; otherwise 0
+*/
+int bencode_string_value(
+    bencode_t * be,
+    const char **str,
+    int *len
+);
+
+/**
+* Tell if there is another item within this list.
+* @param be The bencode object
+* @return 1 if another item exists on the list; 0 otherwise; -1 on invalid processing
+*/
+int bencode_list_has_next(
+    bencode_t * be
+);
+
+/**
+* Get the next item within this list.
+* @param be The bencode object
+* @param be_item The next bencode object that we are going to initiate.
+* @return return 0 on end; 1 on have next; -1 on error
+*/
+int bencode_list_get_next(
+    bencode_t * be,
+    bencode_t * be_item
+);
+
+/**
+ * Copy bencode object into other bencode object
+ */
+void bencode_clone(
+    bencode_t * be,
+    bencode_t * output
+);
+
+/**
+* Get the start and end position of this dictionary
+* @param be Bencode object
+* @param start Starting string
+* @param len Length of the dictionary 
+* @return 1 on success
+*/
+int bencode_dict_get_start_and_len(
+    bencode_t * be,
+    const char **start,
+    int *len
+);
+
+#endif /* BENCODE_H_ */
