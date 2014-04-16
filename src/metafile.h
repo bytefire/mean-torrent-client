@@ -14,7 +14,7 @@ struct metafile_info
 	char (*pieces)[20];
 };
 
-void split_sha1s(char *sha1_str, struct metafile_info *mi);
+void split_sha1s(char *sha1_str, int len, struct metafile_info *mi);
 
 int read_metafile(char *filename, struct metafile_info *mi)
 {
@@ -123,8 +123,8 @@ int read_metafile(char *filename, struct metafile_info *mi)
 	bencode_string_value(&b3, &str, &len);
 	printf("Length: %d. Num pieces: %d\n", len, len/20);
 	temp = calloc(len + 1, 1);
-	strncpy(temp, str, len);
-	split_sha1s(temp, mi);
+	memcpy(temp, str, len);
+	split_sha1s(temp, len, mi);
 	free(temp);
 
 cleanup:
@@ -132,13 +132,15 @@ cleanup:
 	return rv;
 }
 
-void split_sha1s(char *sha1_str, struct metafile_info *mi)
+// len param is needed because if we do strlen then we can hit a null character in middle of sha1_str which is a
+// binray string
+void split_sha1s(char *sha1_str, int len, struct metafile_info *mi)
 {
 	char (*temp)[20];
 	char *input;
-	int len, i, count;
+	int i, count;
 
-	len = strlen(sha1_str);
+	//len = strlen(sha1_str);
 	count = len / 20;
 	(*mi).num_of_pieces = count;
 	
@@ -148,7 +150,7 @@ void split_sha1s(char *sha1_str, struct metafile_info *mi)
 	input = sha1_str;
 	for(i=0; i<len; i+=20)
 	{
-		strncpy(*temp, input, 20);
+		memcpy(*temp, input, 20);
 		temp += 1;
 		input += 20;
 	}
