@@ -1,31 +1,40 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
+#include<stdint.h>
 
 
-unsigned int H0 = 0x67452301;
-unsigned int H1 = 0xEFCDAB89;
-unsigned int H2 = 0x98BADCFE;
-unsigned int H3 = 0x10325476;
-unsigned int H4 = 0xC3D2E1F0;
+uint32_t H0 = 0x67452301;
+uint32_t H1 = 0xEFCDAB89;
+uint32_t H2 = 0x98BADCFE;
+uint32_t H3 = 0x10325476;
+uint32_t H4 = 0xC3D2E1F0;
 
-unsigned int rotate_left(unsigned int val, int by)
+/*
+unsigned int H0 = 0x01234567; // 0x67452301;
+unsigned int H1 = 0x89ABCDEF; // 0xEFCDAB89;
+unsigned int H2 = 0xFEDCBA89; // 0x98BADCFE;
+unsigned int H3 = 0x76543210; // 0x10325476;
+unsigned int H4 = 0xF0E1D2C3; // 0xC3D2E1F0;
+*/
+
+uint32_t rotate_left(uint32_t val, int by)
 {
-	unsigned int rotated = (val<<by) | (val>>(32-by));
+	uint32_t rotated = (val<<by) | (val>>(32-by));
 	return rotated;
 }
 
-void swap_chars(char *c1, char *c2)
+void swap_chars(unsigned char *c1, unsigned char *c2)
 {
-        char temp = *c1;
+        unsigned char temp = *c1;
         *c1 = *c2;
         *c2 = temp;
 }
 
-void small_to_big_endian(char *a, int len)
+void small_to_big_endian(unsigned char *a, int len)
 {
         int i;
-        char *temp;
+        unsigned char *temp;
 
         temp = a;
         // simply reverse the bytes
@@ -35,25 +44,26 @@ void small_to_big_endian(char *a, int len)
         }
 }
 
-char *pad_msg(char *msg, long long msg_len, int *pad_len)
+unsigned char *pad_msg(unsigned char *msg, long long msg_len, int *pad_len)
 {
 	*pad_len = (msg_len % 64) < 56 ? ((msg_len / 64 + 1) * 64) : ((msg_len / 64 +2) * 64);
-	char *buf = calloc(*pad_len, 1);
+	unsigned char *buf = calloc(*pad_len, 1);
 	memcpy(buf, msg, msg_len);
 	buf[msg_len] = 0x80;
-
-	small_to_big_endian((char *)&msg_len, 8);
+	
+	msg_len *= 8;
+	small_to_big_endian((unsigned char *)&msg_len, 8);
 	memcpy((buf +(*pad_len) - 8),  &msg_len, 8);
 	
 	return buf;
 }
 
-unsigned int f(int t, unsigned int B, unsigned int C, unsigned int D)
+uint32_t f(int t, uint32_t B, uint32_t C, uint32_t D)
 {
     // f(t;B,C,D) = (B AND C) OR ((NOT B) AND D)         ( 0 <= t <= 19)
     if(t>=0 && t<=19)
     {
-        return ((B & C) | (~B) & D);
+        return ((B & C) | ((~B) & D));
     }
     // f(t;B,C,D) = B XOR C XOR D                        (20 <= t <= 39)
     if(t>= 20 && t<=39)
@@ -70,40 +80,55 @@ unsigned int f(int t, unsigned int B, unsigned int C, unsigned int D)
     {
         return ( B^C^D );
     }
+
+    return 0;
 }
   
-unsigned int get_k(int t)
+uint32_t get_k(int t)
 {
     // K(t) = 5A827999         ( 0 <= t <= 19)
     if(t>=0 && t<=19)
     {
-        return 0x5A827999;
+        return 0x5A827999; 
+		// 0x9979825A;
     }
     // K(t) = 6ED9EBA1         (20 <= t <= 39)
     if(t>=20 && t<=39)
     {
-        return 0x6ED9EBA1;
+        return 0x6ED9EBA1; 
+		// 0xA1EBD96E;
     }
     // K(t) = 8F1BBCDC         (40 <= t <= 59)
     if(t >= 40 && t<=59)
     {
-        return 0x8F1BBCDC;
+        return  0x8F1BBCDC; 
+		//  0xDCBC1B8F;
     }
     // K(t) = CA62C1D6         (60 <= t <= 79)
     if(t>=60 && t<=79)
     {
-        return 0xCA62C1D6;
+        return 0xCA62C1D6; 
+		// 0xD6C162CA;
     }
+    
+    return 0;
 }
 
-void process_block(char *M)
+void process_block(unsigned char *M)
 {
 	int t;
-	unsigned int temp;
-	unsigned int A, B, C, D, E;
-	unsigned int *W = malloc(80*4); // 80 words
-	memcpy(W, M, 64); // 64 bytes == 16 words == 512 bits
-	
+	uint32_t temp;
+	uint32_t A, B, C, D, E;
+	uint32_t W[80]; // 80 words
+	// memcpy(W, M, 64); // 64 bytes == 16 words == 512 bits
+	for(t = 0; t < 16; t++)
+    	{
+        	W[t] = M[t * 4] << 24;
+	        W[t] |= M[t * 4 + 1] << 16;
+        	W[t] |= M[t * 4 + 2] << 8;
+       		W[t] |= M[t * 4 + 3];
+   	}	
+
 	for(t=16; t<80; t++)
 	{
 		W[t] = (W[t-3] ^ W[t-8] ^ W[t-14] ^ W[t-16]);
@@ -119,17 +144,16 @@ void process_block(char *M)
 	}
 
 	H0 = H0 + A; H1 = H1 + B; H2 = H2 + C; H3 = H3 + D; H4 = H4 + E;
-	free(W);
 }
 
 // uses the method described here: https://tools.ietf.org/html/rfc3174#section-6.1 
-char *sha1_compute(char *msg, int msg_len)
+unsigned char *sha1_compute(unsigned char *msg, int msg_len)
 {
 	// pad msg
 	int pad_len, i;
-	char *padded;
-	char *sha1 = malloc(20);
-	char *temp;
+	unsigned char *padded;
+	unsigned char *sha1 = malloc(20);
+	unsigned char *temp;
 
 	padded = pad_msg(msg, msg_len, &pad_len);
 	// process in 512 byte chunks
@@ -139,6 +163,12 @@ char *sha1_compute(char *msg, int msg_len)
 		process_block(temp);
 		temp += 64;
 	}
+
+	small_to_big_endian((unsigned char *)&H0, 4);
+	small_to_big_endian((unsigned char *)&H1, 4);
+	small_to_big_endian((unsigned char *)&H2, 4);
+	small_to_big_endian((unsigned char *)&H3, 4);
+	small_to_big_endian((unsigned char *)&H4, 4);
 	
 	// now copy H0 to H4 into the sha1 buffer
 	temp = sha1;
