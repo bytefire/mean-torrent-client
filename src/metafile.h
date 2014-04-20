@@ -9,6 +9,8 @@ struct metafile_info
 {
 	char *announce_url;
 	char *file_name; // filename with path
+	char md5[32];
+	char *top_most_directory; // the 'name' field in info dictionary
 	long int length;
 	long int piece_length;
 	long int num_of_pieces;
@@ -27,7 +29,7 @@ int read_metafile(char *filename, struct metafile_info *mi)
 	int len, rv;
 	char *contents, *temp;
 	const char *str;
-	bencode_t b1, b2, b3, b4, b5, b6; // bn where n represents level of nestedness
+	bencode_t b1, b2, b3; // bn where n represents level of nestedness
 
 	rv = 0;
 	fp = fopen(filename, "r");
@@ -66,66 +68,48 @@ int read_metafile(char *filename, struct metafile_info *mi)
 	memcpy(mi->info_val, b2.start, mi->info_len);
 
 	bencode_dict_get_next(&b2, &b3, &str, &len); // this should be key files for multi-file torrent
-	if(strncmp(str, "files", 5) != 0)
+	if(strncmp(str, "length", 6) == 0)
 	{
-		fprintf(stderr, "Expected the key 'files' but didn't find it.\n");
-		rv = -1;
-		goto cleanup;
+		bencode_int_value(&b3, &(*mi).length);
+        	bencode_dict_get_next(&b2, &b3, &str, &len);
+        	if(strncmp(str, "md5sum", 5) == 0)
+       		{
+			// TODO: populate md5
+			bencode_dict_get_next(&b2, &b3, &str, &len);
+	        }
+		// else b3 must now point to value of the key 'name' in info dictionary.
 	}
 	else
 	{
+		if(strncmp(str, "files", 5) != 0)
+	        {
+        	        fprintf(stderr, "Expected the key 'length' or 'files' but didn't find either.\n");
+                	rv = -1;
+                	goto cleanup;
+	        }
+
 		// here b3 contains value for the key 'files'
 		if(parse_multiple_files(&b3, mi) == -1)
 		{
 			rv = -1;
 			goto cleanup;
 		}
+
+		bencode_dict_get_next(&b2, &b3, &str, &len); // this should be key 'name'
 	}
 
-
-/*
-	// TODO: this assumes there is only one file. we should parse this list (in b3) in a while loop.
-	// every dictionary in the list represents a file.
-	bencode_list_get_next(&b3, &b4);
-	bencode_dict_get_next(&b4, &b5, &str, &len);
-	if(strncmp(str, "length", 6) != 0)
-	{
-		fprintf(stderr, "Expected key 'length' but didn't find it.\n");
-		rv = -1;
-		goto cleanup;
-	}
-	bencode_int_value(&b5, &(*mi).length);
-	bencode_dict_get_next(&b4, &b5, &str, &len);
-        if(strncmp(str, "md5sum", 5) == 0)
-        {
-        	bencode_dict_get_next(&b4, &b5, &str, &len);        
-        }
-	if(strncmp(str, "path", 4) != 0)
-	{
-		fprintf(stderr, "Expected key 'path' but didn't find it.\n");
-		rv = -1;
-		goto cleanup;
-	}
-	// TODO: this assumes there will ever be just one file name element in the list.
-	// run a while loop to go through all the elements one by one. every element is a directory name
-	// and the last element is file name.
-	bencode_list_get_next(&b5, &b6);
-	bencode_string_value(&b6, &str, &len);
-	(*mi).file_name = calloc(len + 1, 1);
-	strncpy((*mi).file_name, str, len);
-*/
-
-
-	/********** Done with 'files' which is a list of dictionaries. ******************/
-
-	bencode_dict_get_next(&b2, &b3, &str, &len); // this should be key 'name'
-        if(strncmp(str, "name", 4) != 0)
+	/********** Done with 'files' which is a list of dictionaries (or single file) and b3 has value of 'name' key. ******************/
+        
+	if(strncmp(str, "name", 4) != 0)
         {
                 fprintf(stderr, "Expected the key 'name' but didn't find it.\n");
                 rv = -1;
                 goto cleanup;
         }
-	// TODO: assign top level directory name to the the bencode info struct.
+
+	bencode_string_value(&b3, &str, &len);
+        mi->top_most_directory = calloc(len + 1, 1);
+        strncpy(mi->top_most_directory, str, len);
 
 	bencode_dict_get_next(&b2, &b3, &str, &len); // this should be key 'piece length'
         if(strncmp(str, "piece length", 12) != 0)
@@ -199,6 +183,7 @@ int parse_multiple_files(bencode_t *files_list, struct metafile_info *mi)
         bencode_dict_get_next(&ba, &bb, &str, &len);
         if(strncmp(str, "md5sum", 5) == 0)
         {
+		// TODO: parse md5 here
                 bencode_dict_get_next(&ba, &bb, &str, &len);
         }
         if(strncmp(str, "path", 4) != 0)
@@ -214,6 +199,7 @@ int parse_multiple_files(bencode_t *files_list, struct metafile_info *mi)
         (*mi).file_name = calloc(len + 1, 1);
         strncpy((*mi).file_name, str, len);
 
+	return 0;
 }
 
 void metafile_print(struct metafile_info *mi)
@@ -221,11 +207,12 @@ void metafile_print(struct metafile_info *mi)
 	//int i;
 	//char (*temp)[20];
 
-	printf("Announce URL: %s\n", (*mi).announce_url);
-	printf("File name: %s\n", (*mi).file_name);
-	printf("Length: %ld\n", (*mi).length);
-	printf("Piece length: %ld\n", (*mi).piece_length);
-	printf("Number of pieces: %ld\n", (*mi).num_of_pieces);
+	printf("Announce URL: %s\n", mi->announce_url);
+	printf("Top-most directory: %s\n", mi->top_most_directory);
+	printf("File name: %s\n", mi->file_name);
+	printf("Length: %ld\n", mi->length);
+	printf("Piece length: %ld\n", mi->piece_length);
+	printf("Number of pieces: %ld\n", mi->num_of_pieces);
 	printf("Pieces:\n");
 	
 	/*
@@ -243,6 +230,7 @@ void metafile_free(struct metafile_info *mi)
 {
 	free((*mi).announce_url);
 	free((*mi).file_name);
+	free(mi->top_most_directory);
 	free((*mi).pieces);
 	free(mi->info_val);
 }
