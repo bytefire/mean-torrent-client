@@ -24,17 +24,17 @@ uint32_t rotate_left(uint32_t val, int by)
 	return rotated;
 }
 
-void swap_chars(unsigned char *c1, unsigned char *c2)
+void swap_chars(uint8_t *c1, uint8_t *c2)
 {
-        unsigned char temp = *c1;
+        uint8_t temp = *c1;
         *c1 = *c2;
         *c2 = temp;
 }
 
-void small_to_big_endian(unsigned char *a, int len)
+void small_to_big_endian(uint8_t *a, int len)
 {
         int i;
-        unsigned char *temp;
+        uint8_t *temp;
 
         temp = a;
         // simply reverse the bytes
@@ -44,15 +44,15 @@ void small_to_big_endian(unsigned char *a, int len)
         }
 }
 
-unsigned char *pad_msg(unsigned char *msg, long long msg_len, int *pad_len)
+uint8_t *pad_msg(uint8_t *msg, long long msg_len, int *pad_len)
 {
 	*pad_len = (msg_len % 64) < 56 ? ((msg_len / 64 + 1) * 64) : ((msg_len / 64 +2) * 64);
-	unsigned char *buf = calloc(*pad_len, 1);
+	uint8_t *buf = calloc(*pad_len, 1);
 	memcpy(buf, msg, msg_len);
 	buf[msg_len] = 0x80;
 	
 	msg_len *= 8;
-	small_to_big_endian((unsigned char *)&msg_len, 8);
+	small_to_big_endian((uint8_t *)&msg_len, 8);
 	memcpy((buf +(*pad_len) - 8),  &msg_len, 8);
 	
 	return buf;
@@ -114,7 +114,7 @@ uint32_t get_k(int t)
     return 0;
 }
 
-void process_block(unsigned char *M)
+void process_block(uint8_t *M)
 {
 	int t;
 	uint32_t temp;
@@ -147,13 +147,13 @@ void process_block(unsigned char *M)
 }
 
 // uses the method described here: https://tools.ietf.org/html/rfc3174#section-6.1 
-unsigned char *sha1_compute(unsigned char *msg, int msg_len)
+uint8_t *sha1_compute(uint8_t *msg, int msg_len)
 {
 	// pad msg
 	int pad_len, i;
-	unsigned char *padded;
-	unsigned char *sha1 = malloc(20);
-	unsigned char *temp;
+	uint8_t *padded;
+	uint8_t *sha1 = malloc(20);
+	uint8_t *temp;
 
 	padded = pad_msg(msg, msg_len, &pad_len);
 	// process in 512 byte chunks

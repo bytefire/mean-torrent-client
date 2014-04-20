@@ -1,6 +1,7 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
+#include<stdint.h>
 
 #include "bencode.h"
 
@@ -12,9 +13,13 @@ struct metafile_info
 	long int piece_length;
 	long int num_of_pieces;
 	char (*pieces)[20];
+	int info_len;
+	uint8_t *info_val;
 };
 
 void split_sha1s(char *sha1_str, int len, struct metafile_info *mi);
+
+int parse_multiple_files(bencode_t *files_list, struct metafile_info *mi);
 
 int read_metafile(char *filename, struct metafile_info *mi)
 {
@@ -56,14 +61,29 @@ int read_metafile(char *filename, struct metafile_info *mi)
 		}				
 	}
 
-	bencode_dict_get_next(&b2, &b3, &str, &len); // this should be key files
+	mi->info_len = b1.str - b2.start;
+	mi->info_val = malloc(mi->info_len);
+	memcpy(mi->info_val, b2.start, mi->info_len);
+
+	bencode_dict_get_next(&b2, &b3, &str, &len); // this should be key files for multi-file torrent
 	if(strncmp(str, "files", 5) != 0)
 	{
 		fprintf(stderr, "Expected the key 'files' but didn't find it.\n");
 		rv = -1;
 		goto cleanup;
 	}
+	else
+	{
+		// here b3 contains value for the key 'files'
+		if(parse_multiple_files(&b3, mi) == -1)
+		{
+			rv = -1;
+			goto cleanup;
+		}
+	}
 
+
+/*
 	// TODO: this assumes there is only one file. we should parse this list (in b3) in a while loop.
 	// every dictionary in the list represents a file.
 	bencode_list_get_next(&b3, &b4);
@@ -93,6 +113,9 @@ int read_metafile(char *filename, struct metafile_info *mi)
 	bencode_string_value(&b6, &str, &len);
 	(*mi).file_name = calloc(len + 1, 1);
 	strncpy((*mi).file_name, str, len);
+*/
+
+
 	/********** Done with 'files' which is a list of dictionaries. ******************/
 
 	bencode_dict_get_next(&b2, &b3, &str, &len); // this should be key 'name'
@@ -156,10 +179,47 @@ void split_sha1s(char *sha1_str, int len, struct metafile_info *mi)
 	}
 }
 
+int parse_multiple_files(bencode_t *files_list, struct metafile_info *mi)
+{
+	//        b4, b5, b6
+	bencode_t ba, bb, bc;
+	const char *str;
+	int len;
+	
+	// TODO: this assumes there is only one file. we should parse this list (in b3) in a while loop.
+        // every dictionary in the list represents a file.
+        bencode_list_get_next(files_list, &ba);
+        bencode_dict_get_next(&ba, &bb, &str, &len);
+        if(strncmp(str, "length", 6) != 0)
+        {
+                fprintf(stderr, "Expected key 'length' but didn't find it.\n");
+                return -1;
+        }
+        bencode_int_value(&bb, &(*mi).length);
+        bencode_dict_get_next(&ba, &bb, &str, &len);
+        if(strncmp(str, "md5sum", 5) == 0)
+        {
+                bencode_dict_get_next(&ba, &bb, &str, &len);
+        }
+        if(strncmp(str, "path", 4) != 0)
+        {
+                fprintf(stderr, "Expected key 'path' but didn't find it.\n");
+                return -1;
+        }
+        // TODO: this assumes there will ever be just one file name element in the list.
+        // run a while loop to go through all the elements one by one. every element is a directory name
+        // and the last element is file name.
+        bencode_list_get_next(&bb, &bc);
+        bencode_string_value(&bc, &str, &len);
+        (*mi).file_name = calloc(len + 1, 1);
+        strncpy((*mi).file_name, str, len);
+
+}
+
 void metafile_print(struct metafile_info *mi)
 {
-	int i;
-	char (*temp)[20];
+	//int i;
+	//char (*temp)[20];
 
 	printf("Announce URL: %s\n", (*mi).announce_url);
 	printf("File name: %s\n", (*mi).file_name);
@@ -168,6 +228,7 @@ void metafile_print(struct metafile_info *mi)
 	printf("Number of pieces: %ld\n", (*mi).num_of_pieces);
 	printf("Pieces:\n");
 	
+	/*
 	temp = (*mi).pieces;
 
 	for(i=0; i<(*mi).num_of_pieces; i++)
@@ -175,11 +236,13 @@ void metafile_print(struct metafile_info *mi)
 		printf("  %d) %s\n", i, *temp);
 		temp += 1;
 	}
+	*/
 }
 
-void free_metafile(struct metafile_info *mi)
+void metafile_free(struct metafile_info *mi)
 {
 	free((*mi).announce_url);
 	free((*mi).file_name);
 	free((*mi).pieces);
+	free(mi->info_val);
 }
