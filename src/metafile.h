@@ -78,6 +78,9 @@ int read_metafile(char *filename, struct metafile_info *mi)
 			bencode_dict_get_next(&b2, &b3, &str, &len);
 	        }
 		// else b3 must now point to value of the key 'name' in info dictionary.
+
+		// since single file won't have file_name set so zero it out:
+		mi->file_name = '\0';
 	}
 	else
 	{

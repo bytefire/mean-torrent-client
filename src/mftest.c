@@ -5,8 +5,8 @@
 #include "metafile.h"
 #include "sha1.h"
 
-// #define FILE_NAME "loff.torrent"
-#define FILE_NAME "dbc.torrent"
+#define FILE_NAME "loff.torrent"
+// #define FILE_NAME "dbc.torrent"
 
 int main(int argc, char *argv[])
 {
