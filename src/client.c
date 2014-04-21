@@ -8,7 +8,7 @@
 #include "sha1.h"
 
 #define FILE_NAME "../files/loff.torrent"
-// #define FILE_NAME "../files/dbc.torrent"
+//#define FILE_NAME "../files/dbc.torrent"
 #define PEER_ID_HEX "dd0e76bcc7f711e3af893c77e686ca85b8f12e20";
 
 
@@ -24,18 +24,19 @@ char *get_first_request(char *announce_url, char *info_hash_hex, char *peer_id_h
 
 int parse_metainfo_file(struct metafile_info *mi, char **hash);
 
+char *make_tracker_http_request(char *request);
+
+void write_to_file(char *str);
+
 int main()
 {
 	int rv;
-	curl_global_init(CURL_GLOBAL_ALL);
-	CURL *my_handle;
-	CURLcode result;
-	struct buffer_struct output;
 	char *request_url;
-	char *peer_id_hex = PEER_ID_HEX;
-	
+	char *peer_id_hex = PEER_ID_HEX;	
 	char *hash = malloc(41);
         struct metafile_info mi;
+
+	char *tracker_response;
 
 	rv=0;
 
@@ -46,41 +47,50 @@ int main()
 	}	
 
 	request_url = get_first_request(mi.announce_url, hash, peer_id_hex, mi.length);
+	tracker_response = make_tracker_http_request(request_url);
+	write_to_file(tracker_response);
 
-
-	output.buffer = NULL;
-	output.size = 0;
-	my_handle = curl_easy_init();
-	curl_easy_setopt(my_handle, CURLOPT_WRITEFUNCTION, write_memory_callback);
-	curl_easy_setopt(my_handle, CURLOPT_WRITEDATA, (void *)&output);
-	curl_easy_setopt(my_handle, CURLOPT_URL, request_url);
-	result = curl_easy_perform(my_handle);
-	curl_easy_cleanup(my_handle);
-
-	FILE *fp;
-	fp = fopen("tests/loff.announce.3", "w");
-	if(!fp)
-	{
-		fprintf(stderr, "Failed to open file to write tracker's announce response.\n");
-		return -1;
-	}
-	fprintf(fp, output.buffer);
-	fclose(fp);
-
-	if(output.buffer)
-	{
-		free(output.buffer);
-		output.buffer = NULL;
-		output.size = 0;
-	}
 	printf("LibCurl rules.\n");
 
 cleanup:
 	metafile_free(&mi);
         free(hash);
 	free(request_url);
+	free(tracker_response);
 	
 	return rv;
+}
+
+void write_to_file(char *str)
+{
+	FILE *fp;
+        fp = fopen("tests/loff.announce.3", "w");
+        if(!fp)
+        {
+                fprintf(stderr, "Failed to open file to write tracker's announce response.\n");
+                return;
+        }
+        fprintf(fp, str);
+        fclose(fp);
+}
+
+char *make_tracker_http_request(char *request)
+{
+	curl_global_init(CURL_GLOBAL_ALL);
+        CURL *my_handle;
+        CURLcode result;
+	struct buffer_struct output;
+
+	output.buffer = NULL;
+        output.size = 0;
+        my_handle = curl_easy_init();
+        curl_easy_setopt(my_handle, CURLOPT_WRITEFUNCTION, write_memory_callback);
+        curl_easy_setopt(my_handle, CURLOPT_WRITEDATA, (void *)&output);
+        curl_easy_setopt(my_handle, CURLOPT_URL, request);
+        result = curl_easy_perform(my_handle);
+        curl_easy_cleanup(my_handle);	
+	
+	return output.buffer;
 }
 
 int parse_metainfo_file(struct metafile_info *mi, char **hash)
