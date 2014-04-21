@@ -7,8 +7,8 @@
 #include "metafile.h"
 #include "sha1.h"
 
-#define FILE_NAME "loff.torrent"
-// #define FILE_NAME "dbc.torrent"
+#define FILE_NAME "../files/loff.torrent"
+// #define FILE_NAME "../files/dbc.torrent"
 #define PEER_ID_HEX "dd0e76bcc7f711e3af893c77e686ca85b8f12e20";
 
 
@@ -58,7 +58,7 @@ int main()
 	curl_easy_cleanup(my_handle);
 
 	FILE *fp;
-	fp = fopen("loff.announce.2", "w");
+	fp = fopen("tests/loff.announce.3", "w");
 	if(!fp)
 	{
 		fprintf(stderr, "Failed to open file to write tracker's announce response.\n");
