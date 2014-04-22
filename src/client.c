@@ -9,6 +9,7 @@
 
 #define FILE_NAME "../files/loff.torrent"
 //#define FILE_NAME "../files/dbc.torrent"
+#define ANNOUNCE_FILE "../files/loff.announce"
 #define PEER_ID_HEX "dd0e76bcc7f711e3af893c77e686ca85b8f12e20";
 
 
@@ -64,7 +65,7 @@ cleanup:
 void write_to_file(char *str)
 {
 	FILE *fp;
-        fp = fopen("tests/loff.announce.3", "w");
+        fp = fopen(ANNOUNCE_FILE, "w");
         if(!fp)
         {
                 fprintf(stderr, "Failed to open file to write tracker's announce response.\n");
@@ -72,6 +73,11 @@ void write_to_file(char *str)
         }
         fprintf(fp, str);
         fclose(fp);
+}
+
+void print_peers(char *announce)
+{
+	
 }
 
 char *make_tracker_http_request(char *request)
