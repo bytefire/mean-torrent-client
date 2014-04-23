@@ -6,6 +6,7 @@
 
 #include "metafile.h"
 #include "sha1.h"
+#include "peers.h"
 
 #define FILE_NAME "../files/loff.torrent"
 //#define FILE_NAME "../files/dbc.torrent"
@@ -36,6 +37,8 @@ int main()
 	char *peer_id_hex = PEER_ID_HEX;	
 	char *hash = malloc(41);
         struct metafile_info mi;
+	uint8_t *info_hash;
+	uint8_t our_peer_id[20];
 
 	char *tracker_response;
 
@@ -49,7 +52,8 @@ int main()
 
 	request_url = get_first_request(mi.announce_url, hash, peer_id_hex, mi.length);
 	tracker_response = make_tracker_http_request(request_url);
-	write_to_file(tracker_response);
+	info_hash = sha1_compute(mi.info_val, mi.info_len);
+	peers_create_metadata(tracker_response, info_hash, our_peer_id);
 
 	printf("LibCurl rules.\n");
 
@@ -58,6 +62,7 @@ cleanup:
         free(hash);
 	free(request_url);
 	free(tracker_response);
+	free(info_hash);
 	
 	return rv;
 }
@@ -114,7 +119,6 @@ int parse_metainfo_file(struct metafile_info *mi, char **hash)
 
         printf("\nSHA1 of info dictionary: ");
         sha1 = sha1_compute(mi->info_val, mi->info_len);
-        
 	
 	for(i=0; i<20; i++)
         {
@@ -124,6 +128,7 @@ int parse_metainfo_file(struct metafile_info *mi, char **hash)
 
 	printf("%s\n", (*hash));
 	
+	free(sha1);
 	return 0;
 }
 
