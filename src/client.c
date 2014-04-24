@@ -8,9 +8,9 @@
 #include "sha1.h"
 #include "peers.h"
 
-#define FILE_NAME "../files/loff.torrent"
-//#define FILE_NAME "../files/dbc.torrent"
-#define ANNOUNCE_FILE "../files/loff.announce"
+#define FILE_NAME "/home/bytefire/dev/code/bit-torrent-client/files/loff.torrent"
+//#define FILE_NAME "~/dev/code/bit-torrent-client/files/dbc.torrent"
+#define ANNOUNCE_FILE "/home/bytefire/dev/code/bit-torrent-client/files/loff.announce"
 #define PEER_ID_HEX "dd0e76bcc7f711e3af893c77e686ca85b8f12e20";
 
 
@@ -29,6 +29,8 @@ int parse_metainfo_file(struct metafile_info *mi, char **hash);
 char *make_tracker_http_request(char *request);
 
 void write_to_file(char *str);
+
+int read_whole_file(char *filename, char **contents);
 
 int main()
 {
@@ -51,7 +53,11 @@ int main()
 	}	
 
 	request_url = get_first_request(mi.announce_url, hash, peer_id_hex, mi.length);
-	tracker_response = make_tracker_http_request(request_url);
+	// tracker_response = make_tracker_http_request(request_url);
+	if(read_whole_file(ANNOUNCE_FILE, &tracker_response) != 0)
+	{
+		goto cleanup;
+	}
 	info_hash = sha1_compute(mi.info_val, mi.info_len);
 	peers_create_metadata(tracker_response, info_hash, our_peer_id);
 
@@ -65,6 +71,28 @@ cleanup:
 	free(info_hash);
 	
 	return rv;
+}
+
+// TODO: this file reading functionality should go in <proj-name>utils.h
+int read_whole_file(char *filename, char **contents)
+{
+	FILE *fp;
+	int len;
+
+	if((fp =fopen(filename, "r")) == 0)
+	{
+		fprintf(stderr, "Failed to open file %s.\n", filename);
+		return -1;
+	}
+
+	fseek(fp, 0L, SEEK_END);
+        len = ftell(fp);
+        fseek(fp, 0L, SEEK_SET);
+        (*contents) = malloc(len);
+        len = fread((*contents), 1, len, fp);
+        fclose(fp);
+
+	return 0;
 }
 
 void write_to_file(char *str)

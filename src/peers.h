@@ -23,7 +23,9 @@ int peers_extract_from_file(char *filename, struct peer **head)
 	int len;
 	char *contents;
 	int rv;
-
+	
+	rv = 0;	
+	// TODO: this file reading functionality should go in <proj-name>utils.h
 	fp = fopen(filename, "r");
 	fseek(fp, 0L, SEEK_END);
 	len = ftell(fp);
@@ -44,6 +46,7 @@ int peers_extract(char *contents, struct peer **head)
         struct peer *curr, *next;
         uint8_t *swap;
 
+	rv = 0;
 	bencode_init(&b1, contents, len);
 
 	// keep going until we hit the key 'peers'
@@ -105,8 +108,10 @@ void peers_free(struct peer *head)
 
 void peers_create_metadata(char *announce, uint8_t *info_hash, uint8_t *our_peer_id)
 {
-	struct peer *head;
+	struct peer *head, *curr;
 	FILE *fp;
+	int len;
+	char buf[30];
 
 	fp = fopen(METADATA_FILE, "w");
 	
@@ -118,8 +123,29 @@ void peers_create_metadata(char *announce, uint8_t *info_hash, uint8_t *our_peer
         fwrite(our_peer_id, 1, 20, fp);
 
 	// TODO: extract peers linked list and print it as a list of dictionary
+	if(peers_extract(announce, &head) != 0)
+	{
+		fprintf(stderr, "Got problem while extracting peers from announce file.\n");
+		goto cleanup;
+	}
+	fprintf(fp, "5:peersl"); /* start of list of peers */
+	curr = head;
+	while(curr != NULL)
+	{
+		fprintf(fp, "d");
+		fprintf(fp, "2:ip");
+		sprintf(buf, "%d.%d.%d.%d", curr->ip[0], curr->ip[1], curr->ip[2], curr->ip[3]);		
+		len = strlen(buf);
+		fprintf(fp, "%d:%s", len, buf);
+		fprintf(fp, "4:porti%de", curr->port);
+		fprintf(fp, "e");
 
+		curr = curr->next;
+	}
+	fprintf(fp, "e"); /* end of list of peers */
 	// end of root dictionary:
 	fprintf(fp, "e");
+
+cleanup:
 	fclose(fp);
 }
