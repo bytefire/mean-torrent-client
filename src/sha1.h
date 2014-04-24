@@ -10,13 +10,8 @@ uint32_t H2 = 0x98BADCFE;
 uint32_t H3 = 0x10325476;
 uint32_t H4 = 0xC3D2E1F0;
 
-/*
-unsigned int H0 = 0x01234567; // 0x67452301;
-unsigned int H1 = 0x89ABCDEF; // 0xEFCDAB89;
-unsigned int H2 = 0xFEDCBA89; // 0x98BADCFE;
-unsigned int H3 = 0x76543210; // 0x10325476;
-unsigned int H4 = 0xF0E1D2C3; // 0xC3D2E1F0;
-*/
+uint32_t _h0, _h1, _h2, _h3, _h4; // use these instead of H0, H1 etc because when sha1_compute called again,
+                                        // values of H0, H1 etc would have changed from original. (see sha1_compute method below)
 
 uint32_t rotate_left(uint32_t val, int by)
 {
@@ -135,7 +130,7 @@ void process_block(uint8_t *M)
 		W[t] = rotate_left(W[t], 1);
 	}
 
-	A = H0; B = H1; C = H2; D = H3, E = H4;
+	A = _h0; B = _h1; C = _h2; D = _h3, E = _h4;
 
 	for(t = 0; t<80; t++)
 	{
@@ -143,7 +138,7 @@ void process_block(uint8_t *M)
 		E = D; D = C; C = rotate_left(B, 30); B = A; A = temp;
 	}
 
-	H0 = H0 + A; H1 = H1 + B; H2 = H2 + C; H3 = H3 + D; H4 = H4 + E;
+	_h0 = _h0 + A; _h1 = _h1 + B; _h2 = _h2 + C; _h3 = _h3 + D; _h4 = _h4 + E;
 }
 
 // uses the method described here: https://tools.ietf.org/html/rfc3174#section-6.1 
@@ -155,6 +150,7 @@ uint8_t *sha1_compute(uint8_t *msg, int msg_len)
 	uint8_t *sha1 = malloc(20);
 	uint8_t *temp;
 
+	_h0 = H0; _h1 = H1; _h2 = H2; _h3 = H3; _h4 = H4;
 	padded = pad_msg(msg, msg_len, &pad_len);
 	// process in 512 byte chunks
 	temp = padded;
@@ -164,19 +160,19 @@ uint8_t *sha1_compute(uint8_t *msg, int msg_len)
 		temp += 64;
 	}
 
-	small_to_big_endian((unsigned char *)&H0, 4);
-	small_to_big_endian((unsigned char *)&H1, 4);
-	small_to_big_endian((unsigned char *)&H2, 4);
-	small_to_big_endian((unsigned char *)&H3, 4);
-	small_to_big_endian((unsigned char *)&H4, 4);
+	small_to_big_endian((unsigned char *)&_h0, 4);
+	small_to_big_endian((unsigned char *)&_h1, 4);
+	small_to_big_endian((unsigned char *)&_h2, 4);
+	small_to_big_endian((unsigned char *)&_h3, 4);
+	small_to_big_endian((unsigned char *)&_h4, 4);
 	
 	// now copy H0 to H4 into the sha1 buffer
 	temp = sha1;
-	memcpy(temp, &H0, 4);
-	memcpy(temp + 4, &H1, 4);
-	memcpy(temp + 8, &H2, 4);
-	memcpy(temp + 12, &H3, 4);
-	memcpy(temp + 16, &H4, 4);
+	memcpy(temp, &_h0, 4);
+	memcpy(temp + 4, &_h1, 4);
+	memcpy(temp + 8, &_h2, 4);
+	memcpy(temp + 12, &_h3, 4);
+	memcpy(temp + 16, &_h4, 4);
 	
 	free(padded);
 	return sha1;
