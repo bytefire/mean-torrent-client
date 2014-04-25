@@ -132,13 +132,19 @@ void peers_create_metadata(char *announce, uint8_t *info_hash, uint8_t *our_peer
 	curr = head;
 	while(curr != NULL)
 	{
-		fprintf(fp, "d");
+		fprintf(fp, "d"); /* start of dictionary for every peer */
+
 		fprintf(fp, "2:ip");
 		sprintf(buf, "%d.%d.%d.%d", curr->ip[0], curr->ip[1], curr->ip[2], curr->ip[3]);		
 		len = strlen(buf);
 		fprintf(fp, "%d:%s", len, buf);
 		fprintf(fp, "4:porti%de", curr->port);
-		fprintf(fp, "e");
+		fprintf(fp, "6:chokedi0e");
+		fprintf(fp, "8:chokedbyi0e"); // NOTE: other peers unchoked us by default.
+		fprintf(fp, "10:interestedi1e");
+		fprintf(fp, "12:interestedbyi1e"); // NOTE: other peers interested by default.
+
+		fprintf(fp, "e"); /*end of dictionary for every peer */
 
 		curr = curr->next;
 	}
