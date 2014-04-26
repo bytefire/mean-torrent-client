@@ -7,6 +7,8 @@
 #include "metafile.h"
 #include "sha1.h"
 #include "peers.h"
+#include "pwp.h"
+#include "util.h"
 
 #define FILE_NAME "/home/bytefire/dev/code/bit-torrent-client/files/loff.torrent"
 //#define FILE_NAME "~/dev/code/bit-torrent-client/files/dbc.torrent"
@@ -30,7 +32,7 @@ char *make_tracker_http_request(char *request);
 
 void write_to_file(char *str);
 
-int read_whole_file(char *filename, char **contents);
+// int read_whole_file(char *filename, char **contents);
 
 int main()
 {
@@ -40,8 +42,10 @@ int main()
 	char *hash = malloc(41);
         struct metafile_info mi;
 	uint8_t *info_hash;
+	uint8_t *handshake;
 	uint8_t our_peer_id[20];
-
+	int hs_len, len;	
+	
 	char *tracker_response;
 
 	rv=0;
@@ -54,12 +58,15 @@ int main()
 
 	request_url = get_first_request(mi.announce_url, hash, peer_id_hex, mi.length);
 	// tracker_response = make_tracker_http_request(request_url);
-	if(read_whole_file(ANNOUNCE_FILE, &tracker_response) != 0)
+	if(util_read_whole_file(ANNOUNCE_FILE, (uint8_t **)(&tracker_response), &len) != 0)
 	{
 		goto cleanup;
 	}
 	info_hash = sha1_compute(mi.info_val, mi.info_len);
 	peers_create_metadata(tracker_response, info_hash, our_peer_id);
+
+	// for testing only:
+	handshake = compose_handshake(info_hash, our_peer_id, &hs_len);
 
 	printf("LibCurl rules.\n");
 
@@ -73,6 +80,7 @@ cleanup:
 	return rv;
 }
 
+/*
 // TODO: this file reading functionality should go in <proj-name>utils.h
 int read_whole_file(char *filename, char **contents)
 {
@@ -94,6 +102,7 @@ int read_whole_file(char *filename, char **contents)
 
 	return 0;
 }
+*/
 
 void write_to_file(char *str)
 {
