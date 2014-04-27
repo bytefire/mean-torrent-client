@@ -8,7 +8,7 @@
 #include "sha1.h"
 #include "peers.h"
 #include "pwp.h"
-#include "util.h"
+// #include "util.h"
 
 #define FILE_NAME "/home/bytefire/dev/code/bit-torrent-client/files/loff.torrent"
 //#define FILE_NAME "~/dev/code/bit-torrent-client/files/dbc.torrent"

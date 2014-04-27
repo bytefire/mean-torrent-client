@@ -32,6 +32,8 @@ int read_metafile(char *filename, struct metafile_info *mi)
 	bencode_t b1, b2, b3; // bn where n represents level of nestedness
 
 	rv = 0;
+	
+	// TODO: use util_read_whole_file method in util.h
 	fp = fopen(filename, "r");
 	fseek(fp, 0L, SEEK_END);
 	len = ftell(fp);

@@ -8,18 +8,106 @@
 #include<sys/types.h>
 #include<sys/socket.h>
 
+#include "bencode.h"
+#include "util.h"
+
 #define MAX_DATA_LEN 128
+
 
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len);
 int do_handshake(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port);
 
 int pwp_do_handshake(char *md_file)
 {
-	// TODO:
-	// read contents of metadata file
+	uint8_t *metadata;
+	const char *str;
+	int len;
+	long int num;
+	int rv = 0;
+	bencode_t b1, b2, b3, b4; // bn where n is the level of nestedness
+	uint8_t info_hash[20];
+	uint8_t our_peer_id[20];
+	char *ip;
+	uint16_t port;
+
+	if(util_read_whole_file(md_file, &metadata, &len) != 0)
+	{
+		rv = -1;
+		goto cleanup;
+	}
+	
 	// parse it using bencode.h and extract info_hash, our_peer_id, peer ip and port.
+	bencode_init(&b1, (const char *)metadata, len);
+	
+	bencode_dict_get_next(&b1, &b2, &str, &len);
+        if(strncmp(str, "info_hash", 9) != 0)
+        {
+                rv = -1;
+		fprintf(stderr, "Failed to find 'info_hash' in metadata file.\n");
+                goto cleanup;
+        }
+        bencode_string_value(&b2, &str, &len);
+        memcpy(info_hash, str, len);
+
+	bencode_dict_get_next(&b1, &b2, &str, &len);
+        if(strncmp(str, "our_peer_id", 11) != 0)
+        {
+                rv = -1;
+		fprintf(stderr, "Failed to find 'our_peer_id' in metadata file.\n");
+                goto cleanup;
+        }
+        bencode_string_value(&b2, &str, &len);
+        memcpy(our_peer_id, str, len);
+
+	// TODO: reading only the first peer. this needs to go in a loop 
+	bencode_dict_get_next(&b1, &b2, &str, &len);
+        if(strncmp(str, "peers", 5) != 0)
+        {
+                rv = -1;
+		fprintf(stderr, "Failed to find 'peers' in metadata file.\n");
+                goto cleanup;
+        }
+
+/********** begining of what will be a while loop for every peer ******************/
+	// this is first peer in b3 now. b3 is a dictionary.
+	bencode_list_get_next(&b2, &b3);
+	
+	bencode_dict_get_next(&b3, &b4, &str, &len);
+        if(strncmp(str, "ip", 2) != 0)
+        {
+                rv = -1;
+                fprintf(stderr, "Failed to find 'ip' in metadata file.\n");
+                goto cleanup;
+        }
+        bencode_string_value(&b4, &str, &len);
+	ip = malloc(len + 1); // +1 is to leave space for null terminator char
+	memcpy(ip, str, len);
+	ip[len] = '\0';
+
+	bencode_dict_get_next(&b3, &b4, &str, &len);
+        if(strncmp(str, "port", 4) != 0)
+        {
+                rv = -1;
+                fprintf(stderr, "Failed to find 'port' in metadata file.\n");
+                goto cleanup;
+        }
+        bencode_int_value(&b4, &num);
+	port = (uint16_t)num;
+/********** end of what will be while loop for every peer ****************/
+
 	// call do_handshake
-	return 0;	
+	rv = do_handshake(info_hash, our_peer_id, ip, port);
+
+cleanup:
+	if(metadata)
+	{
+		free(metadata);
+	}
+	if(ip)
+	{
+		free(ip);
+	}
+	return rv;	
 }
 
 int do_handshake(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port)
