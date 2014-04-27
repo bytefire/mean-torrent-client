@@ -8,6 +8,7 @@
 #include "sha1.h"
 #include "peers.h"
 #include "pwp.h"
+// TODO: work out the #if_ndef thing so that util.h may be addedd multiple times compile error
 // #include "util.h"
 
 #define FILE_NAME "/home/bytefire/dev/code/bit-torrent-client/files/loff.torrent"
