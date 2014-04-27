@@ -1,3 +1,8 @@
+#ifndef UTIL_H
+#define UTIL_H
+
+#pragma once
+
 #include<stdlib.h>
 #include<stdio.h>
 #include<stdint.h>
@@ -24,3 +29,4 @@ int util_read_whole_file(char *filename, uint8_t **contents, int *file_len)
         return 0;
 }
 
+#endif // UTIL_H
