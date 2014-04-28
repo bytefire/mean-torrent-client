@@ -43,7 +43,7 @@ int main()
         struct metafile_info mi;
 	uint8_t *info_hash;
 	uint8_t *handshake;
-	uint8_t our_peer_id[20];
+	uint8_t *our_peer_id;
 	int hs_len, len;	
 	
 	char *tracker_response;
@@ -63,6 +63,9 @@ int main()
 		goto cleanup;
 	}
 	info_hash = sha1_compute(mi.info_val, mi.info_len);
+	
+	our_peer_id = malloc(20);
+	util_hex_to_ba(peer_id_hex, &our_peer_id);
 	peers_create_metadata(tracker_response, info_hash, our_peer_id);
 
 	// for testing only:
@@ -79,30 +82,6 @@ cleanup:
 	
 	return rv;
 }
-
-/*
-// TODO: this file reading functionality should go in <proj-name>utils.h
-int read_whole_file(char *filename, char **contents)
-{
-	FILE *fp;
-	int len;
-
-	if((fp =fopen(filename, "r")) == 0)
-	{
-		fprintf(stderr, "Failed to open file %s.\n", filename);
-		return -1;
-	}
-
-	fseek(fp, 0L, SEEK_END);
-        len = ftell(fp);
-        fseek(fp, 0L, SEEK_SET);
-        (*contents) = malloc(len);
-        len = fread((*contents), 1, len, fp);
-        fclose(fp);
-
-	return 0;
-}
-*/
 
 void write_to_file(char *str)
 {
