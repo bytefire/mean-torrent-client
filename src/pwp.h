@@ -144,6 +144,12 @@ int do_handshake(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 		goto cleanup;
 	}
 
+	if(connect(socketfd, (struct sockaddr *)&peer, len) == -1)
+        {
+                perror("connect");
+                return -1;
+        }
+
 	if(send(socketfd, hs, hs_len, 0) == -1)
 	{
 		perror("send");
