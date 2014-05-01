@@ -72,6 +72,7 @@ int pwp_do_handshake(char *md_file)
 
 /********** begining of what will be a while loop for every peer ******************/
 	// this is first peer in b3 now. b3 is a dictionary.
+// while(bencode_list_has_next(&b2) { ...
 	bencode_list_get_next(&b2, &b3);
 	
 	bencode_dict_get_next(&b3, &b4, &str, &len);
@@ -178,6 +179,7 @@ uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len)
 {
 	uint8_t *hs, *curr;
 	uint8_t temp;
+	int i;
 
 	*len = 49+19;
 	hs = malloc(*len);
@@ -188,8 +190,11 @@ uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len)
 	strncpy((char *)curr, "BitTorrent protocol", 19);
 	curr += 19;
 	temp = 0;
-	memcpy(curr, &temp, 1);
-	curr += 1;
+	for(i=0; i<8; i++)
+	{
+		memcpy(curr, &temp, 1);
+		curr += 1;
+	}
 	memcpy(curr, info_hash, 20);
 	curr += 20;
 	memcpy(curr, our_peer_id, 20);

@@ -32,8 +32,6 @@ char *make_tracker_http_request(char *request);
 
 void write_to_file(char *str);
 
-// int read_whole_file(char *filename, char **contents);
-
 int main()
 {
 	int rv;
@@ -57,11 +55,14 @@ int main()
 	}	
 
 	request_url = get_first_request(mi.announce_url, hash, peer_id_hex, mi.length);
-	// tracker_response = make_tracker_http_request(request_url);
+	// tracker_response = (char *)make_tracker_http_request(request_url);
+	// write_to_file(tracker_response);
+	
 	if(util_read_whole_file(ANNOUNCE_FILE, (uint8_t **)(&tracker_response), &len) != 0)
 	{
 		goto cleanup;
 	}
+	
 	info_hash = sha1_compute(mi.info_val, mi.info_len);
 	
 	our_peer_id = malloc(20);
@@ -69,8 +70,8 @@ int main()
 	peers_create_metadata(tracker_response, info_hash, our_peer_id);
 
 	// for testing only:
-	handshake = compose_handshake(info_hash, our_peer_id, &hs_len);
-
+	// handshake = compose_handshake(info_hash, our_peer_id, &hs_len);
+	
 	printf("LibCurl rules.\n");
 
 cleanup:
@@ -79,10 +80,14 @@ cleanup:
 	free(request_url);
 	free(tracker_response);
 	free(info_hash);
-	
+	if(our_peer_id)
+	{
+		free(our_peer_id);
+	}
 	return rv;
 }
 
+// TODO: this method is a candidate for util.h
 void write_to_file(char *str)
 {
 	FILE *fp;
