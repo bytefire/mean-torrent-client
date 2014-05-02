@@ -9,17 +9,18 @@
 #include<sys/socket.h>
 #include<netinet/in.h>
 #include<arpa/inet.h>
+#include<sys/time.h>
 
 #include "bencode.h"
 #include "util.h"
 
-#define MAX_DATA_LEN 128
+#define MAX_DATA_LEN 512
 
 
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len);
-int do_handshake(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port);
+int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port);
 
-int pwp_do_handshake(char *md_file)
+int pwp_start(char *md_file)
 {
 	uint8_t *metadata;
 	const char *str;
@@ -72,34 +73,36 @@ int pwp_do_handshake(char *md_file)
 
 /********** begining of what will be a while loop for every peer ******************/
 	// this is first peer in b3 now. b3 is a dictionary.
-// while(bencode_list_has_next(&b2) { ...
-	bencode_list_get_next(&b2, &b3);
+	while(bencode_list_has_next(&b2))
+	{	
+		bencode_list_get_next(&b2, &b3);
 	
-	bencode_dict_get_next(&b3, &b4, &str, &len);
-        if(strncmp(str, "ip", 2) != 0)
-        {
-                rv = -1;
-                fprintf(stderr, "Failed to find 'ip' in metadata file.\n");
-                goto cleanup;
-        }
-        bencode_string_value(&b4, &str, &len);
-	ip = malloc(len + 1); // +1 is to leave space for null terminator char
-	memcpy(ip, str, len);
-	ip[len] = '\0';
+		bencode_dict_get_next(&b3, &b4, &str, &len);
+        	if(strncmp(str, "ip", 2) != 0)
+       		{
+                	rv = -1;
+                	fprintf(stderr, "Failed to find 'ip' in metadata file.\n");
+                	goto cleanup;
+        	}
+        	bencode_string_value(&b4, &str, &len);
+		ip = malloc(len + 1); // +1 is to leave space for null terminator char
+		memcpy(ip, str, len);
+		ip[len] = '\0';
 
-	bencode_dict_get_next(&b3, &b4, &str, &len);
-        if(strncmp(str, "port", 4) != 0)
-        {
-                rv = -1;
-                fprintf(stderr, "Failed to find 'port' in metadata file.\n");
-                goto cleanup;
-        }
-        bencode_int_value(&b4, &num);
-	port = (uint16_t)num;
+		bencode_dict_get_next(&b3, &b4, &str, &len);
+	        if(strncmp(str, "port", 4) != 0)
+       		{
+        	        rv = -1;
+	                fprintf(stderr, "Failed to find 'port' in metadata file.\n");
+                	goto cleanup;
+        	}
+       		bencode_int_value(&b4, &num);
+		port = (uint16_t)num;
+		// call do_handshake
+		printf("*** Going to process peer: %s:%d", ip, port);
+		rv = talk_to_peer(info_hash, our_peer_id, ip, port);
+	}
 /********** end of what will be while loop for every peer ****************/
-
-	// call do_handshake
-	rv = do_handshake(info_hash, our_peer_id, ip, port);
 
 cleanup:
 	if(metadata)
@@ -113,7 +116,7 @@ cleanup:
 	return rv;	
 }
 
-int do_handshake(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port)
+int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port)
 {
 	int rv;
 	int hs_len;
@@ -123,8 +126,14 @@ int do_handshake(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	uint16_t peer_port;
 	int len;
 	uint8_t buf[MAX_DATA_LEN];
+	fd_set recvfd;
+	struct timeval tv;
 
 	rv = 0;
+	FD_ZERO(&recvfd);
+	tv.tv_sec = 3;
+	tv.tv_usec = 0;
+
 	hs = compose_handshake(info_hash, our_peer_id, &hs_len);
 	
 	peer_port = htons(port);
@@ -134,6 +143,8 @@ int do_handshake(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 		rv = -1;
 		goto cleanup;
 	}
+	FD_SET(socketfd, &recvfd);
+
 	len = sizeof(struct sockaddr_in);
 	bzero(&peer, len);
 	peer.sin_family = AF_INET;
@@ -158,6 +169,19 @@ int do_handshake(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 		goto cleanup;
 	}	
 
+	rv = select(socketfd + 1, &recvfd, NULL, NULL, &tv);
+	if(rv == -1)
+	{
+		perror("select");
+		goto cleanup;
+	}	
+	if(rv == 0)
+	{
+		fprintf(stderr, "Recv timed out. Peer: %s\n", ip);
+		rv = -1;
+		goto cleanup;
+	}
+
 	len = recv(socketfd, buf, MAX_DATA_LEN, 0);
 	if(len == -1)
 	{
@@ -165,6 +189,43 @@ int do_handshake(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 		rv = -1;
 		goto cleanup;
 	}
+
+	if(len == 0)
+	{
+		fprintf(stderr, "Remote peer closed connection on handshake.\n");
+		rv = -1;
+		goto cleanup;
+	}
+
+	printf("Received reply of length %d\n", len);
+	// TODO: validate the response inside 'buf'
+
+	rv = select(socketfd + 1, &recvfd, NULL, NULL, &tv);
+        if(rv == -1)
+        {
+                perror("select");
+                goto cleanup;
+        }
+        if(rv == 0)
+        {
+                fprintf(stderr, "Recv timed out. Peer: %s\n", ip);
+                rv = -1;
+                goto cleanup;
+        }
+	len = recv(socketfd, buf, MAX_DATA_LEN, 0);
+	if(len == -1)
+        {
+                perror("recv");
+                rv = -1;
+                goto cleanup;
+        }
+        if(len == 0)
+        {
+                fprintf(stderr, "Remote peer closed connection.\n");
+                rv = -1;
+                goto cleanup;
+        }
+
 
 cleanup:
 	if(socketfd > 0)
