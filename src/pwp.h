@@ -14,10 +14,22 @@
 #include "bencode.h"
 #include "util.h"
 
-#define MAX_DATA_LEN 512
+#define MAX_DATA_LEN 1024
 
+#define CHOKE_MSG_ID 0
+#define UNCHOKE_MSG_ID 1
+#define INTERESTED_MSG_ID 2
+#define NOT_INTERESTED_MSG_ID 3
+#define HAVE_MSG_ID 4
+#define BITFIELD_MSG_ID 5
+#define REQUEST_MSG_ID 6
+#define PIECE_MSG_ID 7
+#define CANCEL_MSG_ID 8
 
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len);
+uint8_t *compose_interested(int *len);
+
+uint8_t extract_msg_id(uint8_t *response);
 int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port);
 
 int pwp_start(char *md_file)
@@ -99,7 +111,7 @@ int pwp_start(char *md_file)
        		bencode_int_value(&b4, &num);
 		port = (uint16_t)num;
 		// call do_handshake
-		printf("*** Going to process peer: %s:%d", ip, port);
+		printf("*** Going to process peer: %s:%d\n", ip, port);
 		rv = talk_to_peer(info_hash, our_peer_id, ip, port);
 	}
 /********** end of what will be while loop for every peer ****************/
@@ -128,6 +140,8 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	uint8_t buf[MAX_DATA_LEN];
 	fd_set recvfd;
 	struct timeval tv;
+	uint8_t *msg;
+	int msg_len;	
 
 	rv = 0;
 	FD_ZERO(&recvfd);
@@ -162,6 +176,7 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
                 return -1;
         }
 
+	/*********** SEND HANDSHAKE ****************/
 	if(send(socketfd, hs, hs_len, 0) == -1)
 	{
 		perror("send");
@@ -169,6 +184,7 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 		goto cleanup;
 	}	
 
+	/*********** RECEIVE HANDSHAKE ***********/
 	rv = select(socketfd + 1, &recvfd, NULL, NULL, &tv);
 	if(rv == -1)
 	{
@@ -200,33 +216,58 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	printf("Received reply of length %d\n", len);
 	// TODO: validate the response inside 'buf'
 
-	rv = select(socketfd + 1, &recvfd, NULL, NULL, &tv);
-        if(rv == -1)
+	/************** SEND INTERESTED ***********************/
+	msg = compose_interested(&msg_len);
+	
+	if(send(socketfd, msg, msg_len, 0) == -1)
         {
-                perror("select");
-                goto cleanup;
-        }
-        if(rv == 0)
-        {
-                fprintf(stderr, "Recv timed out. Peer: %s\n", ip);
-                rv = -1;
-                goto cleanup;
-        }
-	len = recv(socketfd, buf, MAX_DATA_LEN, 0);
-	if(len == -1)
-        {
-                perror("recv");
-                rv = -1;
-                goto cleanup;
-        }
-        if(len == 0)
-        {
-                fprintf(stderr, "Remote peer closed connection.\n");
+                perror("send");
                 rv = -1;
                 goto cleanup;
         }
 
+	/******** RECEIVE RESPONSE TO INTERESTED *************/
+	int recvd_msg_id = -1;
+	int unchoked = 0;
+	while(recvd_msg_id != UNCHOKE_MSG_ID)
+	{
+		rv = select(socketfd + 1, &recvfd, NULL, NULL, &tv);
+       		if(rv == -1)
+	        {
+        	        perror("select");
+               		goto cleanup;
+        	}
+	        if(rv == 0)
+        	{
+                	fprintf(stderr, "Recv timed out. Peer: %s\n", ip);
+	                rv = -1;
+        	        goto cleanup;
+        	}
+		len = recv(socketfd, buf, MAX_DATA_LEN, 0);
+		if(len == -1)
+	        {
+        	        perror("recv");
+                	rv = -1;
+                	goto cleanup;
+	        }
+        	if(len == 0)
+        	{
+                	fprintf(stderr, "Remote peer closed connection.\n");
+             		rv = -1;
+                	goto cleanup;
+	        }
+		recvd_msg_id = extract_msg_id(buf);
+		printf("> Recvd message of length %d. Msg ID = %d.\n", len, recvd_msg_id);
+		if(recvd_msg_id == UNCHOKE_MSG_ID)
+		{
+			unchoked = 1;
+		}
+	}
 
+	if(unchoked)
+	{
+		printf("Unchoked by peer!\n");
+	}
 cleanup:
 	if(socketfd > 0)
 	{
@@ -235,6 +276,7 @@ cleanup:
 	free(hs);
 	return rv;
 }
+
 
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len)
 {
@@ -261,4 +303,28 @@ uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len)
 	memcpy(curr, our_peer_id, 20);
 
 	return hs;
+}
+
+uint8_t *compose_interested(int *len)
+{
+	int l;
+	uint8_t *msg, *curr;
+	uint8_t msg_id = 2; // message if for interested is 2
+
+	*len = 5;
+	msg = malloc(*len);
+	curr = msg;
+	l = htonl(1);
+	memcpy(curr, &l, 4);
+	
+	curr += 4;
+	memcpy(curr, &msg_id, 1);
+
+	return msg;
+}
+
+uint8_t extract_msg_id(uint8_t *response)
+{
+	uint8_t msg_id = response[4];
+	return msg_id;
 }
