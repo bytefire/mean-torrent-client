@@ -113,6 +113,10 @@ int pwp_start(char *md_file)
 		// call do_handshake
 		printf("*** Going to process peer: %s:%d\n", ip, port);
 		rv = talk_to_peer(info_hash, our_peer_id, ip, port);
+		if(rv == 1)
+		{
+			break;
+		}
 	}
 /********** end of what will be while loop for every peer ****************/
 
@@ -213,7 +217,7 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 		goto cleanup;
 	}
 
-	printf("Received reply of length %d\n", len);
+	printf("Received handshake reply of length %d\n", len);
 	// TODO: validate the response inside 'buf'
 
 	/************** SEND INTERESTED ***********************/
@@ -226,6 +230,7 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
                 goto cleanup;
         }
 
+	printf("Sent interested message.\n");
 	/******** RECEIVE RESPONSE TO INTERESTED *************/
 	int recvd_msg_id = -1;
 	int unchoked = 0;
@@ -267,6 +272,7 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	if(unchoked)
 	{
 		printf("Unchoked by peer!\n");
+		rv = 1;
 	}
 cleanup:
 	if(socketfd > 0)
