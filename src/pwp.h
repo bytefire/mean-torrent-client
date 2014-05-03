@@ -31,7 +31,7 @@ uint8_t *compose_interested(int *len);
 
 uint8_t extract_msg_id(uint8_t *response);
 int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port);
-int receive_msg(int socketfd, fd_set *recvfd, struct timeval *tv, uint8_t *buf, int *len);
+int receive_msg(int socketfd, fd_set *recvfd, struct timeval *tv, uint8_t **msg, int *len);
 
 int pwp_start(char *md_file)
 {
@@ -142,11 +142,12 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	struct sockaddr_in peer;
 	uint16_t peer_port;
 	int len;
-	uint8_t buf[MAX_DATA_LEN];
+	// uint8_t buf[MAX_DATA_LEN];
 	fd_set recvfd;
 	struct timeval tv;
 	uint8_t *msg;
 	int msg_len;	
+	uint8_t *recvd_msg;
 
 	rv = 0;
 	FD_ZERO(&recvfd);
@@ -191,11 +192,12 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 
 	/*********** RECEIVE HANDSHAKE ***********/
 
-	rv = receive_msg(socketfd, &recvfd, &tv, buf, &len);
+	rv = receive_msg(socketfd, &recvfd, &tv, &recvd_msg, &len);
 	if(rv == -1)
 	{
 		goto cleanup;
 	}
+	free(recvd_msg);
 
 	/************** SEND INTERESTED ***********************/
 	msg = compose_interested(&msg_len);
@@ -213,18 +215,19 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	int unchoked = 0;
 	while(recvd_msg_id != UNCHOKE_MSG_ID)
 	{
-		rv = receive_msg(socketfd, &recvfd, &tv, buf, &len);
+		rv = receive_msg(socketfd, &recvfd, &tv, &recvd_msg, &len);
         	if(rv == -1)
         	{
                 	goto cleanup;
         	}	
 
-		recvd_msg_id = extract_msg_id(buf);
+		recvd_msg_id = extract_msg_id(recvd_msg);
 		printf("> Recvd message of length %d. Msg ID = %d.\n", len, recvd_msg_id);
 		if(recvd_msg_id == UNCHOKE_MSG_ID)
 		{
 			unchoked = 1;
 		}
+		free(recvd_msg);
 	}
 
 	if(unchoked)
@@ -242,9 +245,10 @@ cleanup:
 }
 
 
-int receive_msg(int socketfd, fd_set *recvfd, struct timeval *tv, uint8_t *buf, int *len)
+int receive_msg(int socketfd, fd_set *recvfd, struct timeval *tv, uint8_t **msg, int *len)
 {
 	int rv = 0;
+	uint8_t buf[MAX_DATA_LEN];
 	
 	rv = select(socketfd + 1, recvfd, NULL, NULL, tv);
         if(rv == -1)
@@ -274,6 +278,8 @@ int receive_msg(int socketfd, fd_set *recvfd, struct timeval *tv, uint8_t *buf, 
                 goto cleanup;
         }
 
+	*msg = malloc(*len);
+	memcpy(*msg, buf, *len);
         printf("Received handshake reply of length %d\n", *len);
 cleanup:
 	return rv;
