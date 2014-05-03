@@ -31,6 +31,7 @@ uint8_t *compose_interested(int *len);
 
 uint8_t extract_msg_id(uint8_t *response);
 int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port);
+int receive_msg(int socketfd, fd_set *recvfd, struct timeval *tv, uint8_t *buf, int *len);
 
 int pwp_start(char *md_file)
 {
@@ -189,36 +190,12 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	}	
 
 	/*********** RECEIVE HANDSHAKE ***********/
-	rv = select(socketfd + 1, &recvfd, NULL, NULL, &tv);
+
+	rv = receive_msg(socketfd, &recvfd, &tv, buf, &len);
 	if(rv == -1)
 	{
-		perror("select");
-		goto cleanup;
-	}	
-	if(rv == 0)
-	{
-		fprintf(stderr, "Recv timed out. Peer: %s\n", ip);
-		rv = -1;
 		goto cleanup;
 	}
-
-	len = recv(socketfd, buf, MAX_DATA_LEN, 0);
-	if(len == -1)
-	{
-		perror("recv");
-		rv = -1;
-		goto cleanup;
-	}
-
-	if(len == 0)
-	{
-		fprintf(stderr, "Remote peer closed connection on handshake.\n");
-		rv = -1;
-		goto cleanup;
-	}
-
-	printf("Received handshake reply of length %d\n", len);
-	// TODO: validate the response inside 'buf'
 
 	/************** SEND INTERESTED ***********************/
 	msg = compose_interested(&msg_len);
@@ -236,31 +213,12 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	int unchoked = 0;
 	while(recvd_msg_id != UNCHOKE_MSG_ID)
 	{
-		rv = select(socketfd + 1, &recvfd, NULL, NULL, &tv);
-       		if(rv == -1)
-	        {
-        	        perror("select");
-               		goto cleanup;
-        	}
-	        if(rv == 0)
+		rv = receive_msg(socketfd, &recvfd, &tv, buf, &len);
+        	if(rv == -1)
         	{
-                	fprintf(stderr, "Recv timed out. Peer: %s\n", ip);
-	                rv = -1;
-        	        goto cleanup;
-        	}
-		len = recv(socketfd, buf, MAX_DATA_LEN, 0);
-		if(len == -1)
-	        {
-        	        perror("recv");
-                	rv = -1;
                 	goto cleanup;
-	        }
-        	if(len == 0)
-        	{
-                	fprintf(stderr, "Remote peer closed connection.\n");
-             		rv = -1;
-                	goto cleanup;
-	        }
+        	}	
+
 		recvd_msg_id = extract_msg_id(buf);
 		printf("> Recvd message of length %d. Msg ID = %d.\n", len, recvd_msg_id);
 		if(recvd_msg_id == UNCHOKE_MSG_ID)
@@ -283,6 +241,43 @@ cleanup:
 	return rv;
 }
 
+
+int receive_msg(int socketfd, fd_set *recvfd, struct timeval *tv, uint8_t *buf, int *len)
+{
+	int rv = 0;
+	
+	rv = select(socketfd + 1, recvfd, NULL, NULL, tv);
+        if(rv == -1)
+        {
+                perror("select");
+                goto cleanup;
+        }
+        if(rv == 0)
+        {
+                fprintf(stderr, "Recv timed out.\n");
+                rv = -1;
+                goto cleanup;
+        }
+
+        *len = recv(socketfd, buf, MAX_DATA_LEN, 0);
+        if(*len == -1)
+        {
+                perror("recv");
+                rv = -1;
+                goto cleanup;
+        }
+
+        if(*len == 0)
+        {
+                fprintf(stderr, "Remote peer closed connection on handshake.\n");
+                rv = -1;
+                goto cleanup;
+        }
+
+        printf("Received handshake reply of length %d\n", *len);
+cleanup:
+	return rv;
+}
 
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len)
 {
