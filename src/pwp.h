@@ -250,37 +250,56 @@ int receive_msg(int socketfd, fd_set *recvfd, struct timeval *tv, uint8_t **msg,
 {
 	int rv = 0;
 	uint8_t buf[MAX_DATA_LEN];
+	int complete = 0;
+	uint8_t *curr;
+	int rl, is_cont = 0; // remaining length and is continued
+
+	*msg = malloc(MAX_DATA_LEN);
+	curr = *msg;
+	do
+	{	
+		rv = select(socketfd + 1, recvfd, NULL, NULL, tv);
+        	if(rv == -1)
+        	{
+                	perror("select");
+                	goto cleanup;
+        	}
+	        if(rv == 0)
+        	{
+	                fprintf(stderr, "Recv timed out.\n");
+                	rv = -1;
+        	        goto cleanup;
+	        }
+
+        	*len = recv(socketfd, buf, MAX_DATA_LEN, 0);
+        	if(*len == -1)
+	        {
+        	        perror("recv");
+	                rv = -1;
+                	goto cleanup;
+        	}
+
+	        if(*len == 0)
+        	{
+               		fprintf(stderr, "Remote peer closed connection on handshake.\n");
+                	rv = -1;
+        	        goto cleanup;
+	        }
 	
-	rv = select(socketfd + 1, recvfd, NULL, NULL, tv);
-        if(rv == -1)
-        {
-                perror("select");
-                goto cleanup;
-        }
-        if(rv == 0)
-        {
-                fprintf(stderr, "Recv timed out.\n");
-                rv = -1;
-                goto cleanup;
-        }
+		memcpy(curr, buf, *len);
+		complete = is_complete(curr, *len, is_cont, &rl);
+		if(!complete)
+		{
+			is_cont = 1;
+		}
+		else
+		{
+			is_cont = 0;
+		}
+		curr += *len;
+	
+	} while(!complete);
 
-        *len = recv(socketfd, buf, MAX_DATA_LEN, 0);
-        if(*len == -1)
-        {
-                perror("recv");
-                rv = -1;
-                goto cleanup;
-        }
-
-        if(*len == 0)
-        {
-                fprintf(stderr, "Remote peer closed connection on handshake.\n");
-                rv = -1;
-                goto cleanup;
-        }
-
-	*msg = malloc(*len);
-	memcpy(*msg, buf, *len);
         printf("Received handshake reply of length %d\n", *len);
 cleanup:
 	return rv;
@@ -319,7 +338,7 @@ int is_complete(uint8_t *buf, int len, int is_cont, int *rl)
 			fprintf(stderr, "!!!!!Problem, because BT message length itself is broken up!!!!!!\n");
 			return -1;
 		}
-		bt_msg_len = ntohl((int)buf);
+		bt_msg_len = ntohl((int)(*buf));
 		
 		if(bt_msg_len + 4 == len)
 		{
