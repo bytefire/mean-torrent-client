@@ -62,4 +62,22 @@ int util_hex_to_ba(char *hex, uint8_t **ba)
     return 0;
 } 
 
+void util_append_to_file(char *filename, char *str, int len)
+{
+        FILE *fp;
+        fp = fopen(filename, "a");
+        if(!fp)
+        {
+                fprintf(stderr, "Failed to open file.\n");
+                return;
+        }
+        int i;
+        for(i = 0; i<len; i++)
+        {
+                fputc(str[i], fp);
+        }
+        fclose(fp);
+}
+
+
 #endif // UTIL_H
