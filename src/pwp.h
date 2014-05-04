@@ -32,6 +32,7 @@ uint8_t *compose_interested(int *len);
 uint8_t extract_msg_id(uint8_t *response);
 int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port);
 int receive_msg(int socketfd, fd_set *recvfd, struct timeval *tv, uint8_t **msg, int *len);
+int is_complete(uint8_t *buf, int len, int is_cont, int *rl);
 
 int pwp_start(char *md_file)
 {
@@ -283,6 +284,56 @@ int receive_msg(int socketfd, fd_set *recvfd, struct timeval *tv, uint8_t **msg,
         printf("Received handshake reply of length %d\n", *len);
 cleanup:
 	return rv;
+}
+
+// TODO: this doesn't take into account the scenario when first four bytes (length of a bt msg) are 
+//	broken across two messages
+int is_complete(uint8_t *buf, int len, int is_cont, int *rl)
+{
+	int bt_msg_len;
+	int m_rl = *rl; // rl = remaining length
+
+	if(is_cont) // i.e. continuation of an existing message
+	{
+	// 3 possibilities: len < rl (incomplete msg), len == rl (complete msg and nothing more), len > rl (complete msg and some more)
+		if(len < m_rl)
+		{
+			*rl = m_rl - len;
+			return 0;
+		}
+
+		if(len == m_rl)
+		{
+			*rl = 0;
+			return 1;
+		}
+		// here means len > m_rl
+		buf += m_rl;
+		len = len - m_rl;
+	}
+
+	while(1)
+	{
+		if(len < 4)
+		{
+			fprintf(stderr, "!!!!!Problem, because BT message length itself is broken up!!!!!!\n");
+			return -1;
+		}
+		bt_msg_len = ntohl((int)buf);
+		
+		if(bt_msg_len + 4 == len)
+		{
+			return 1;
+		}
+		if(bt_msg_len + 4 > len)
+		{
+			*rl = bt_msg_len + 4 - len;
+			return 0;
+		}
+		// if here then there is another msg in buf
+		buf += bt_msg_len + 4;
+		len = len - bt_msg_len - 4;
+	}
 }
 
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len)
