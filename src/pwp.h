@@ -31,8 +31,8 @@ uint8_t *compose_interested(int *len);
 
 uint8_t extract_msg_id(uint8_t *response);
 int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port);
-int receive_msg(int socketfd, fd_set *recvfd, struct timeval *tv, uint8_t **msg, int *len);
-int is_complete(uint8_t *buf, int len, int is_cont, int *rl);
+int receive_msg(int socketfd, int has_hs, fd_set *recvfd, struct timeval *tv, uint8_t **msg, int *len);
+int is_complete(uint8_t *buf, int len, int is_cont, int has_hs, int *rl);
 
 int pwp_start(char *md_file)
 {
@@ -193,7 +193,7 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 
 	/*********** RECEIVE HANDSHAKE ***********/
 
-	rv = receive_msg(socketfd, &recvfd, &tv, &recvd_msg, &len);
+	rv = receive_msg(socketfd, 1, &recvfd, &tv, &recvd_msg, &len);
 	if(rv == -1)
 	{
 		goto cleanup;
@@ -216,7 +216,7 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	int unchoked = 0;
 	while(recvd_msg_id != UNCHOKE_MSG_ID)
 	{
-		rv = receive_msg(socketfd, &recvfd, &tv, &recvd_msg, &len);
+		rv = receive_msg(socketfd, 0, &recvfd, &tv, &recvd_msg, &len);
         	if(rv == -1)
         	{
                 	goto cleanup;
@@ -246,7 +246,7 @@ cleanup:
 }
 
 
-int receive_msg(int socketfd, fd_set *recvfd, struct timeval *tv, uint8_t **msg, int *len)
+int receive_msg(int socketfd, int has_hs, fd_set *recvfd, struct timeval *tv, uint8_t **msg, int *len)
 {
 	int rv = 0;
 	uint8_t buf[MAX_DATA_LEN];
@@ -287,7 +287,7 @@ int receive_msg(int socketfd, fd_set *recvfd, struct timeval *tv, uint8_t **msg,
 	        }
 	
 		memcpy(curr, buf, *len);
-		complete = is_complete(curr, *len, is_cont, &rl);
+		complete = is_complete(curr, *len, is_cont, has_hs, &rl);
 		if(!complete)
 		{
 			is_cont = 1;
@@ -307,11 +307,34 @@ cleanup:
 
 // TODO: this doesn't take into account the scenario when first four bytes (length of a bt msg) are 
 //	broken across two messages
-int is_complete(uint8_t *buf, int len, int is_cont, int *rl)
+int is_complete(uint8_t *buf, int len, int is_cont, int has_hs, int *rl)
 {
 	int bt_msg_len;
-	int m_rl = *rl; // rl = remaining length
+	int m_rl; // rl = remaining length
 
+	m_rl = 0;
+	if(has_hs) // if the message contains handshake then hs must be at start.
+	{
+		m_rl += (uint8_t)(*buf); // length of protocol name, at the moment 19.
+		m_rl += 1 + 8 + 20 + 20; // + length byte + 8 reserved + info hash + our peer id
+		
+		// 3 possibilities of relative values of hs_jump and len (>,=,<)
+		if(m_rl > len)
+		{
+			*rl = m_rl - len;
+			return 0;
+		}
+		if(m_rl == len)
+		{
+			*rl = 0;
+			return 1;
+		}
+		// if here then hs_jump < len
+		buf += m_rl;
+		len = len - m_rl;
+	}
+
+	m_rl = *rl;
 	if(is_cont) // i.e. continuation of an existing message
 	{
 	// 3 possibilities: len < rl (incomplete msg), len == rl (complete msg and nothing more), len > rl (complete msg and some more)
@@ -338,10 +361,11 @@ int is_complete(uint8_t *buf, int len, int is_cont, int *rl)
 			fprintf(stderr, "!!!!!Problem, because BT message length itself is broken up!!!!!!\n");
 			return -1;
 		}
-		bt_msg_len = ntohl((int)(*buf));
+		bt_msg_len = ntohl( (*(int *)buf));
 		
 		if(bt_msg_len + 4 == len)
 		{
+			*rl = 0;
 			return 1;
 		}
 		if(bt_msg_len + 4 > len)
