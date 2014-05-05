@@ -444,8 +444,8 @@ int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 		1. Extract peer_id
 		2. Jump curr to start of next msg and update len accordingly.
 		*/
-		jump = (uint8_t)(*temp) + 1 + 8 + 20;
 		temp = curr;
+		jump = (uint8_t)(*temp) + 1 + 8 + 20;
 		temp += jump;
 		peer->peer_id = malloc(20);
 		memcpy(peer->peer_id, temp, 20);
