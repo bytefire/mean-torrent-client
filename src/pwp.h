@@ -32,7 +32,22 @@ uint8_t *compose_interested(int *len);
 uint8_t extract_msg_id(uint8_t *response);
 int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port);
 int receive_msg(int socketfd, int has_hs, fd_set *recvfd, struct timeval *tv, uint8_t **msg, int *len);
+/*
+Checks if the message in buf is a complete bittorrent peer message.
+buf: the message as received from socket
+len: length of the message in buf
+is_cont: is the message in buf a continuation of BT message which started in an earlier socket message.
+has_hs: true if the message in buf contains handshake. if yes then handshake must be at the beginnning.
+rl: remaining length. when msg is a continuation then rl is used for input too.
+*/
 int is_complete(uint8_t *buf, int len, int is_cont, int has_hs, int *rl);
+int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer);
+
+struct pwp_peer
+{
+	uint8_t *peer_id;
+	int unchoked;
+};
 
 int pwp_start(char *md_file)
 {
@@ -143,12 +158,12 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	struct sockaddr_in peer;
 	uint16_t peer_port;
 	int len;
-	// uint8_t buf[MAX_DATA_LEN];
 	fd_set recvfd;
 	struct timeval tv;
 	uint8_t *msg;
 	int msg_len;	
 	uint8_t *recvd_msg;
+	struct pwp_peer peer_status;
 
 	rv = 0;
 	FD_ZERO(&recvfd);
@@ -420,4 +435,66 @@ uint8_t extract_msg_id(uint8_t *response)
 {
 	uint8_t msg_id = response[4];
 	return msg_id;
+}
+
+int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
+{
+	int rv;
+	uint8_t *curr, *temp;
+	curr = msgs;
+	temp = curr;
+	rv = 0;
+
+	if(has_hs)
+	{
+		/* TODO: 
+		1. Extract peer_id
+		2. Jump curr to start of next msg and update len accordingly.
+		*/
+	}
+
+	while(len > 0)
+	{
+		temp = curr;
+		switch(extract_msg_id(temp))
+		{
+			case BITFIELD_MSG_ID:
+				// TODO: populate global stats collection
+				break;
+			case UNCHOKE_MSG_ID:
+				// TODO: set unchoke on peer
+				break;
+			// TODO: other cases
+			case CHOKE_MSG_ID:
+				// TODO:
+				break;
+			case INTERESTED_MSG_ID:
+				// TODO:
+				break;
+			case NOT_INTERESTED_MSG_ID:
+				// TODO:
+				break;
+			case HAVE_MSG_ID:
+				// TODO:
+				break;
+			case REQUEST_MSG_ID:
+				// TODO:
+				break;
+			case PIECE_MSG_ID:
+				// TODO:
+				break;
+			case CANCEL_MSG_ID:
+				// TODO:
+				break;
+			default:
+				rv = -1;
+				goto cleanup;
+		}
+
+		// TODO: Move curr to next message and update len accordingly.
+		
+	}
+
+cleanup:
+	return rv;
 }
