@@ -26,6 +26,12 @@
 #define PIECE_MSG_ID 7
 #define CANCEL_MSG_ID 8
 
+struct pwp_peer
+{
+        uint8_t *peer_id;
+        int unchoked;
+};
+
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len);
 uint8_t *compose_interested(int *len);
 
@@ -42,12 +48,6 @@ rl: remaining length. when msg is a continuation then rl is used for input too.
 */
 int is_complete(uint8_t *buf, int len, int is_cont, int has_hs, int *rl);
 int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer);
-
-struct pwp_peer
-{
-	uint8_t *peer_id;
-	int unchoked;
-};
 
 int pwp_start(char *md_file)
 {
@@ -164,7 +164,9 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	int msg_len;	
 	uint8_t *recvd_msg;
 	struct pwp_peer peer_status;
-
+	
+	peer_status.peer_id = NULL;
+	peer_status.unchoked = 0;
 	rv = 0;
 	FD_ZERO(&recvfd);
 	tv.tv_sec = 3;
@@ -213,6 +215,7 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	{
 		goto cleanup;
 	}
+	process_msgs(recvd_msg, len, 1, &peer_status);
 	free(recvd_msg);
 
 	/************** SEND INTERESTED ***********************/
@@ -227,29 +230,20 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 
 	printf("Sent interested message.\n");
 	/******** RECEIVE RESPONSE TO INTERESTED *************/
-	int recvd_msg_id = -1;
-	int unchoked = 0;
-	while(recvd_msg_id != UNCHOKE_MSG_ID)
+	while(!peer_status.unchoked)
 	{
 		rv = receive_msg(socketfd, 0, &recvfd, &tv, &recvd_msg, &len);
         	if(rv == -1)
         	{
                 	goto cleanup;
         	}	
-
-		recvd_msg_id = extract_msg_id(recvd_msg);
-		printf("> Recvd message of length %d. Msg ID = %d.\n", len, recvd_msg_id);
-		if(recvd_msg_id == UNCHOKE_MSG_ID)
+		process_msgs(recvd_msg, len, 0, &peer_status);
+		if(peer_status.unchoked)
 		{
-			unchoked = 1;
+			printf("> UNCHOKED!\n");
 		}
-		free(recvd_msg);
-	}
 
-	if(unchoked)
-	{
-		printf("Unchoked by peer!\n");
-		rv = 1;
+		free(recvd_msg);
 	}
 cleanup:
 	if(socketfd > 0)
@@ -439,18 +433,24 @@ uint8_t extract_msg_id(uint8_t *response)
 
 int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 {
-	int rv;
+	int rv, jump;
 	uint8_t *curr, *temp;
 	curr = msgs;
-	temp = curr;
 	rv = 0;
 
 	if(has_hs)
 	{
-		/* TODO: 
+		/* 
 		1. Extract peer_id
 		2. Jump curr to start of next msg and update len accordingly.
 		*/
+		jump = (uint8_t)(*temp) + 1 + 8 + 20;
+		temp = curr;
+		temp += jump;
+		peer->peer_id = malloc(20);
+		memcpy(peer->peer_id, temp, 20);
+		curr += jump + 20;
+		len = len - jump - 20;
 	}
 
 	while(len > 0)
@@ -460,13 +460,14 @@ int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 		{
 			case BITFIELD_MSG_ID:
 				// TODO: populate global stats collection
+				printf("*-*-* Got bitfield message.\n");
 				break;
 			case UNCHOKE_MSG_ID:
-				// TODO: set unchoke on peer
+				peer->unchoked = 1;
 				break;
 			// TODO: other cases
 			case CHOKE_MSG_ID:
-				// TODO:
+				peer->unchoked = 0;
 				break;
 			case INTERESTED_MSG_ID:
 				// TODO:
@@ -492,7 +493,9 @@ int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 		}
 
 		// TODO: Move curr to next message and update len accordingly.
-		
+		jump = ntohl(*((int *)curr)) + 4;
+		curr += jump;
+		len = len - jump;
 	}
 
 cleanup:

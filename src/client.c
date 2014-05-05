@@ -55,8 +55,8 @@ int main()
 	}	
 
 	request_url = get_first_request(mi.announce_url, hash, peer_id_hex, mi.length);
-	// tracker_response = (char *)make_tracker_http_request(request_url);
-	// write_to_file(tracker_response);
+	tracker_response = (char *)make_tracker_http_request(request_url);
+	write_to_file(tracker_response);
 	
 	if(util_read_whole_file(ANNOUNCE_FILE, (uint8_t **)(&tracker_response), &len) != 0)
 	{
