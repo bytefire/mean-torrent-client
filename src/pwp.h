@@ -250,7 +250,7 @@ int receive_msg(int socketfd, int has_hs, fd_set *recvfd, struct timeval *tv, ui
 {
 	int rv = 0;
 	uint8_t buf[MAX_DATA_LEN];
-	int complete = 0;
+	int complete = 1; // this must be set to 1 at the start. because when it is false it means the message is continuation of an older one.
 	uint8_t *curr;
 	int rl, is_cont = 0; // remaining length and is continued
 
@@ -287,15 +287,7 @@ int receive_msg(int socketfd, int has_hs, fd_set *recvfd, struct timeval *tv, ui
 	        }
 	
 		memcpy(curr, buf, *len);
-		complete = is_complete(curr, *len, is_cont, has_hs, &rl);
-		if(!complete)
-		{
-			is_cont = 1;
-		}
-		else
-		{
-			is_cont = 0;
-		}
+		complete = is_complete(curr, *len, !complete, has_hs, &rl);
 		curr += *len;
 	
 	} while(!complete);
