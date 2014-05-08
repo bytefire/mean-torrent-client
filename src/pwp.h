@@ -25,6 +25,7 @@
 #define REQUEST_MSG_ID 6
 #define PIECE_MSG_ID 7
 #define CANCEL_MSG_ID 8
+#define KEEP_ALIVE_MSG_ID 100
 
 struct pwp_peer
 {
@@ -451,6 +452,10 @@ uint8_t *compose_interested(int *len)
 
 uint8_t extract_msg_id(uint8_t *response)
 {
+	if((*(int *)response) == 0) //if length is zero then keep alive msg
+	{
+		return KEEP_ALIVE_MSG_ID;
+	}
 	uint8_t msg_id = response[4];
 	return msg_id;
 }
@@ -483,32 +488,43 @@ int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 		{
 			case BITFIELD_MSG_ID:
 				// TODO: populate global stats collection
-				printf("*-*-* Got bitfield message.\n");
+				printf("*-*-* Got BITFIELD message.\n");
 				break;
 			case UNCHOKE_MSG_ID:
 				peer->unchoked = 1;
+				printf("*-*-* Got UNCHOKE message.\n");
 				break;
 			// TODO: other cases
 			case CHOKE_MSG_ID:
 				peer->unchoked = 0;
+				printf("*-*-* Got CHOKE message.\n");
 				break;
 			case INTERESTED_MSG_ID:
 				// TODO:
+				printf("*-*-* Got INTERESTED message.\n");
 				break;
 			case NOT_INTERESTED_MSG_ID:
 				// TODO:
+				printf("*-*-* Got NOT INTERESTED message.\n");
 				break;
 			case HAVE_MSG_ID:
 				// TODO:
+				printf("*-*-* Got HAVE message.\n");
 				break;
 			case REQUEST_MSG_ID:
 				// TODO:
 				break;
 			case PIECE_MSG_ID:
 				// TODO:
+				printf("*-*-* Got REQUEST message.\n");
 				break;
 			case CANCEL_MSG_ID:
 				// TODO:
+				printf("*-*-* Got CANCEL message.\n");
+				break;
+			case KEEP_ALIVE_MSG_ID:
+			        // TODO:
+				printf("*-*-* Got KEEP ALIVE message.\n");
 				break;
 			default:
 				rv = -1;
