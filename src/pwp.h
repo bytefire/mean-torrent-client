@@ -27,6 +27,8 @@
 #define CANCEL_MSG_ID 8
 #define KEEP_ALIVE_MSG_ID 100
 
+#define RECV_NO_MORE_MSGS 1
+
 struct pwp_peer
 {
         uint8_t peer_id[20]; // TODO: should this be uint8_t peer_id[20]?
@@ -216,17 +218,20 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 		goto cleanup;
 	}	
 
-	/*********** RECEIVE HANDSHAKE ***********/
+	/*********** RECEIVE HANDSHAKE + BITFIELD + HAVE's (possibly) ***********/
 
-	rv = receive_msg(socketfd, 1, &recvfd, &tv, &recvd_msg, &len);
-	if(rv == -1)
+	while((rv = receive_msg(socketfd, 1, &recvfd, &tv, &recvd_msg, &len)) != RECV_NO_MORE_MSGS)
 	{
-		goto cleanup;
+		if(rv == -1)
+		{
+			goto cleanup;
+		}
+		process_msgs(recvd_msg, len, 1, &peer_status);
+		free(recvd_msg);
 	}
-	process_msgs(recvd_msg, len, 1, &peer_status);
-	free(recvd_msg);
-
 	/************** SEND INTERESTED ***********************/
+	// TODO: check if this peer has any pieces we don't have and then send interested.
+	
 	msg = compose_interested(&msg_len);
 	
 	if(send(socketfd, msg, msg_len, 0) == -1)
@@ -255,18 +260,7 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 		printf("> UNCHOKED!\n");
         }
 	
-	while(!pieces)
-	{
-		rv = receive_msg(socketfd, 0, &recvfd, &tv, &recvd_msg, &len);
-                if(rv == -1)
-                {
-                        goto cleanup;
-                }
-                process_msgs(recvd_msg, len, 0, &peer_status);
-                free(recvd_msg);
-	}
-
-	// if here then pieces must be populated.
+	// if here then pieces must be populated and we're unchoked too.
 	// TODO: start requesting pieces	
 
 
@@ -301,7 +295,7 @@ int receive_msg(int socketfd, int has_hs, fd_set *recvfd, struct timeval *tv, ui
 	        if(rv == 0)
         	{
 	                fprintf(stderr, "Recv timed out.\n");
-                	rv = -1;
+                	rv = RECV_NO_MORE_MSGS;
         	        goto cleanup;
 	        }
 
