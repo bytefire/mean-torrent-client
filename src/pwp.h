@@ -28,9 +28,17 @@
 
 struct pwp_peer
 {
-        uint8_t *peer_id;
+        uint8_t peer_id[20]; // TODO: should this be uint8_t peer_id[20]?
         int unchoked;
 };
+
+struct pwp_piece
+{
+	uint8_t peer_id[20]; // TODO: should this be uint8_t peer_id[20]?
+	int idx;
+};
+
+struct pwp_piece *pieces = NULL;
 
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len);
 uint8_t *compose_interested(int *len);
@@ -165,7 +173,6 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	uint8_t *recvd_msg;
 	struct pwp_peer peer_status;
 	
-	peer_status.peer_id = NULL;
 	peer_status.unchoked = 0;
 	rv = 0;
 	FD_ZERO(&recvfd);
@@ -232,19 +239,36 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	/******** RECEIVE RESPONSE TO INTERESTED *************/
 	while(!peer_status.unchoked)
 	{
+		// TODO: refactor this set of lines into it's own method. it's repeated whenever we want to receive messages.
 		rv = receive_msg(socketfd, 0, &recvfd, &tv, &recvd_msg, &len);
         	if(rv == -1)
         	{
                 	goto cleanup;
         	}	
 		process_msgs(recvd_msg, len, 0, &peer_status);
-		if(peer_status.unchoked)
-		{
-			printf("> UNCHOKED!\n");
-		}
-
 		free(recvd_msg);
 	}
+	
+	if(peer_status.unchoked)
+        {
+		printf("> UNCHOKED!\n");
+        }
+	
+	while(!pieces)
+	{
+		rv = receive_msg(socketfd, 0, &recvfd, &tv, &recvd_msg, &len);
+                if(rv == -1)
+                {
+                        goto cleanup;
+                }
+                process_msgs(recvd_msg, len, 0, &peer_status);
+                free(recvd_msg);
+	}
+
+	// if here then pieces must be populated.
+	// TODO: start requesting pieces	
+
+
 cleanup:
 	if(socketfd > 0)
 	{
@@ -447,7 +471,6 @@ int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 		temp = curr;
 		jump = (uint8_t)(*temp) + 1 + 8 + 20;
 		temp += jump;
-		peer->peer_id = malloc(20);
 		memcpy(peer->peer_id, temp, 20);
 		curr += jump + 20;
 		len = len - jump - 20;
