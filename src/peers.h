@@ -105,8 +105,25 @@ void peers_free(struct peer *head)
 	head = NULL;
 }
 
+/*
+Format of metadata file:
+------------------------
 
-void peers_create_metadata(char *announce, uint8_t *info_hash, uint8_t *our_peer_id)
+Whole file is one bencoded dictionary with following keys.
+
+1. info_hash: 20 byte info hash
+2. our_peer_id: 20 byte our peer id
+3. num_of_pieces (integer): total number of pieces
+4. piece_length (integer): length of each piece in bytes
+5. peers (list of dictionaries): each element is a dictionary with following keys.
+	a. ip
+	b. port
+	c. choked
+	d. chokedby
+	e. interested
+	f. interestedby
+*/
+void peers_create_metadata(char *announce, uint8_t *info_hash, uint8_t *our_peer_id, long int num_of_pieces, long int piece_length)
 {
 	struct peer *head, *curr;
 	FILE *fp;
@@ -116,13 +133,17 @@ void peers_create_metadata(char *announce, uint8_t *info_hash, uint8_t *our_peer
 	fp = fopen(METADATA_FILE, "w");
 	
 	fprintf(fp, "d");
+
 	fprintf(fp, "9:info_hash20:");
 	fwrite(info_hash, 1, 20, fp);
 
         fprintf(fp, "11:our_peer_id20:");
         fwrite(our_peer_id, 1, 20, fp);
 
-	// TODO: extract peers linked list and print it as a list of dictionary
+	fprintf(fp, "13:num_of_piecesi%de", num_of_pieces);
+        
+	fprintf(fp, "12:piece_lengthi%de", piece_length);
+	
 	if(peers_extract(announce, &head) != 0)
 	{
 		fprintf(stderr, "Got problem while extracting peers from announce file.\n");

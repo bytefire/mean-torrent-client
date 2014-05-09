@@ -67,7 +67,7 @@ int main()
 	
 	our_peer_id = malloc(20);
 	util_hex_to_ba(peer_id_hex, &our_peer_id);
-	peers_create_metadata(tracker_response, info_hash, our_peer_id);
+	peers_create_metadata(tracker_response, info_hash, our_peer_id, mi.num_of_pieces, mi.piece_length);
 
 	// for testing only:
 	// handshake = compose_handshake(info_hash, our_peer_id, &hs_len);
