@@ -29,6 +29,10 @@
 
 #define RECV_NO_MORE_MSGS 1
 
+#define PIECE_STATUS_NOT_STARTED 0
+#define PIECE_STATUS_STARTED 1
+#define PIECE_STATUS_COMPLETE 2
+
 struct pwp_peer
 {
         uint8_t peer_id[20]; // TODO: should this be uint8_t peer_id[20]?
@@ -37,8 +41,8 @@ struct pwp_peer
 
 struct pwp_piece
 {
-	uint8_t peer_id[20]; // TODO: should this be uint8_t peer_id[20]?
-	int idx;
+	struct pwp_peer *peer;
+	uint8_t status;
 };
 
 struct pwp_piece *pieces = NULL;
