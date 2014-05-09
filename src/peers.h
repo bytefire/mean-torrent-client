@@ -140,9 +140,9 @@ void peers_create_metadata(char *announce, uint8_t *info_hash, uint8_t *our_peer
         fprintf(fp, "11:our_peer_id20:");
         fwrite(our_peer_id, 1, 20, fp);
 
-	fprintf(fp, "13:num_of_piecesi%de", num_of_pieces);
+	fprintf(fp, "13:num_of_piecesi%lde", num_of_pieces);
         
-	fprintf(fp, "12:piece_lengthi%de", piece_length);
+	fprintf(fp, "12:piece_lengthi%lde", piece_length);
 	
 	if(peers_extract(announce, &head) != 0)
 	{

@@ -42,6 +42,7 @@ struct pwp_piece
 };
 
 struct pwp_piece *pieces = NULL;
+long int piece_length = -1;
 
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len);
 uint8_t *compose_interested(int *len);
@@ -101,6 +102,27 @@ int pwp_start(char *md_file)
         }
         bencode_string_value(&b2, &str, &len);
         memcpy(our_peer_id, str, len);
+
+	bencode_dict_get_next(&b1, &b2, &str, &len);
+        if(strncmp(str, "num_of_pieces", 13) != 0)
+        {
+                rv = -1;
+                fprintf(stderr, "Failed to find 'num_of_pieces' in metadata file.\n");
+                goto cleanup;
+        }
+        bencode_int_value(&b2, &num);
+	pieces = malloc(sizeof(struct pwp_piece) * num);
+	bzero(pieces, sizeof(struct pwp_piece) * num);
+
+	bencode_dict_get_next(&b1, &b2, &str, &len);
+        if(strncmp(str, "piece_length", 12) != 0)
+        {
+                rv = -1;
+                fprintf(stderr, "Failed to find 'piece_length' in metadata file.\n");
+                goto cleanup;
+        }
+        bencode_int_value(&b2, &piece_length);
+        
 
 	// TODO: reading only the first peer. this needs to go in a loop 
 	bencode_dict_get_next(&b1, &b2, &str, &len);
