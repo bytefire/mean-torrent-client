@@ -298,6 +298,7 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
         	}
 		if(rv == RECV_NO_MORE_MSGS)
 		{
+			rv = 0;
 			goto cleanup;
 		}
 
