@@ -295,10 +295,18 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
         	if(rv == -1)
         	{
                 	goto cleanup;
-        	}	
+        	}
+		if(rv == RECV_NO_MORE_MSGS)
+		{
+			goto cleanup;
+		}
+
 		process_msgs(recvd_msg, len, 0, &peer_status);
-		free(recvd_msg);
-		recvd_msg = NULL;
+		if(recvd_msg)
+		{
+			free(recvd_msg);
+			recvd_msg = NULL;
+		}
 	}
 	rv = 0;
 	
@@ -311,7 +319,16 @@ cleanup:
 	{
 		close(socketfd);
 	}
-	free(hs);
+	if(hs)
+	{
+		free(hs);
+		hs = NULL;
+	}
+	if(recvd_msg)
+        {
+		free(recvd_msg);
+                recvd_msg = NULL;
+        }
 	return rv;
 }
 
