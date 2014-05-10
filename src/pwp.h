@@ -33,6 +33,12 @@
 #define PIECE_STATUS_STARTED 1
 #define PIECE_STATUS_COMPLETE 2
 
+#define CONT_NEW 0
+#define CONT_HS 1 // handshake
+#define CONT_MSG 2 // message continuation
+#define CONT_LEN 3 // the 4 bytes containing length of a peer wire protocol message
+#define CONT_COMPLETE 4 // the message was complete
+
 struct pwp_peer
 {
         uint8_t peer_id[20]; // TODO: should this be uint8_t peer_id[20]?
@@ -59,11 +65,12 @@ int receive_msg(int socketfd, int has_hs, fd_set *recvfd, struct timeval *tv, ui
 Checks if the message in buf is a complete bittorrent peer message.
 buf: the message as received from socket
 len: length of the message in buf
-is_cont: is the message in buf a continuation of BT message which started in an earlier socket message.
-has_hs: true if the message in buf contains handshake. if yes then handshake must be at the beginnning.
+cont_status: continuation status of the message. this is one of the CONT_* constants defined above.
 rl: remaining length. when msg is a continuation then rl is used for input too.
+
+returns: one of the CONT_* constants indicating status
 */
-int is_complete(uint8_t *buf, int len, int is_cont, int has_hs, int *rl);
+int is_complete(uint8_t *buf, int len, int cont_status, int *rl);
 int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer);
 
 int pwp_start(char *md_file)
@@ -310,12 +317,16 @@ int receive_msg(int socketfd, int has_hs, fd_set *recvfd, struct timeval *tv, ui
 {
 	int rv = 0;
 	uint8_t buf[MAX_DATA_LEN];
-	int complete = 1; // this must be set to 1 at the start. because when it is false it means the message is continuation of an older one.
+	int complete = 0, cont_status = CONT_NEW;
 	uint8_t *curr;
 	int rl, is_cont = 0; // remaining length and is continued
 
 	*msg = malloc(MAX_DATA_LEN);
 	curr = *msg;
+	if(has_hs)
+	{
+		cont_status = CONT_HS;
+	}
 	do
 	{	
 		rv = select(socketfd + 1, recvfd, NULL, NULL, tv);
@@ -350,25 +361,55 @@ int receive_msg(int socketfd, int has_hs, fd_set *recvfd, struct timeval *tv, ui
 	        }
 	
 		memcpy(curr, buf, *len);
-		complete = is_complete(curr, *len, !complete, has_hs, &rl);
+		cont_status = is_complete(curr, *len, cont_status, &rl);
 		curr += *len;
-	
-	} while(!complete);
+	} while(cont_status != CONT_COMPLETE);
 
         printf("receive_msg: Received handshake reply of length %d\n", *len);
 cleanup:
 	return rv;
 }
 
-// TODO: this doesn't take into account the scenario when first four bytes (length of a bt msg) are 
-//	broken across two messages
-int is_complete(uint8_t *buf, int len, int is_cont, int has_hs, int *rl)
+
+int is_complete(uint8_t *buf, int len, int cont_status, int *rl)
 {
 	int bt_msg_len;
 	int m_rl; // rl = remaining length
 
 	m_rl = 0;
-	if(has_hs) // if the message contains handshake then hs must be at start.
+
+	// handle situation if length of BT message was broken up
+	if(cont_status == CONT_LEN)
+	{
+		// if here then 4 bytes must be like this: 
+		// 	bytes 0 to 2: bytes from previous msg in the same order as the msg (i.e. network order)
+		// 	byte 3: number of bytes remaining to complete the 4 bytes of msg len
+		
+		uint8_t *curr = (uint8_t *)rl;
+		m_rl = (int)(*(curr + 3));
+		if(len < m_rl)
+		{
+			// copy whatever bytes are available and update last byte of rl.
+			memcpy(curr + 4 - m_rl, buf, len);
+			m_rl = m_rl - len;
+			uint8_t temp_len = (uint8_t)m_rl;
+			memcpy(curr + 3, &temp_len, 1);
+			return CONT_LEN;
+		}
+		else
+		{
+			// else copy the length into rl and do the ntohl conversion.
+			// reset things for normal continuation further below.
+			memcpy(curr + 4 - m_rl, buf, m_rl);
+			len = len - m_rl;
+			buf += m_rl;
+			m_rl = ntohl(*rl);
+			*rl = m_rl;
+			cont_status = CONT_MSG;
+		}
+	}
+	
+	if(cont_status == CONT_HS) // if the message contains handshake then hs must be at start.
 	{
 		m_rl += (uint8_t)(*buf); // length of protocol name, at the moment 19.
 		m_rl += 1 + 8 + 20 + 20; // + length byte + 8 reserved + info hash + our peer id
@@ -377,12 +418,12 @@ int is_complete(uint8_t *buf, int len, int is_cont, int has_hs, int *rl)
 		if(m_rl > len)
 		{
 			*rl = m_rl - len;
-			return 0;
+			return CONT_MSG;
 		}
 		if(m_rl == len)
 		{
 			*rl = 0;
-			return 1;
+			return CONT_COMPLETE;
 		}
 		// if here then hs_jump < len
 		buf += m_rl;
@@ -390,19 +431,19 @@ int is_complete(uint8_t *buf, int len, int is_cont, int has_hs, int *rl)
 	}
 
 	m_rl = *rl;
-	if(is_cont) // i.e. continuation of an existing message
+	if(cont_status == CONT_MSG) // i.e. continuation of an existing message
 	{
 	// 3 possibilities: len < rl (incomplete msg), len == rl (complete msg and nothing more), len > rl (complete msg and some more)
 		if(len < m_rl)
 		{
 			*rl = m_rl - len;
-			return 0;
+			return CONT_MSG;
 		}
 
 		if(len == m_rl)
 		{
 			*rl = 0;
-			return 1;
+			return CONT_COMPLETE;
 		}
 		// here means len > m_rl
 		buf += m_rl;
@@ -413,20 +454,24 @@ int is_complete(uint8_t *buf, int len, int is_cont, int has_hs, int *rl)
 	{
 		if(len < 4)
 		{
-			fprintf(stderr, "!!!!!Problem, because BT message length itself is broken up!!!!!!\n");
-			return -1;
+			// copy whatever bytes are available and update last byte of rl.
+			uint8_t *curr = (uint8_t *)rl;
+                        memcpy(curr, buf, len);
+                        uint8_t temp_len = (uint8_t)(4 - len);
+                        memcpy(curr + 3, &temp_len, 1);
+                        return CONT_LEN;
 		}
 		bt_msg_len = ntohl( (*(int *)buf));
 		
 		if(bt_msg_len + 4 == len)
 		{
 			*rl = 0;
-			return 1;
+			return CONT_COMPLETE;
 		}
 		if(bt_msg_len + 4 > len)
 		{
 			*rl = bt_msg_len + 4 - len;
-			return 0;
+			return CONT_MSG;
 		}
 		// if here then there is another msg in buf
 		buf += bt_msg_len + 4;
