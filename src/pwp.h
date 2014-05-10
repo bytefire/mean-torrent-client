@@ -37,6 +37,7 @@ struct pwp_peer
 {
         uint8_t peer_id[20]; // TODO: should this be uint8_t peer_id[20]?
         int unchoked;
+	int has_pieces;
 };
 
 struct pwp_piece
@@ -127,8 +128,6 @@ int pwp_start(char *md_file)
         }
         bencode_int_value(&b2, &piece_length);
         
-
-	// TODO: reading only the first peer. this needs to go in a loop 
 	bencode_dict_get_next(&b1, &b2, &str, &len);
         if(strncmp(str, "peers", 5) != 0)
         {
@@ -138,11 +137,11 @@ int pwp_start(char *md_file)
         }
 
 /********** begining of what will be a while loop for every peer ******************/
-	// this is first peer in b3 now. b3 is a dictionary.
 	while(bencode_list_has_next(&b2))
 	{	
 		bencode_list_get_next(&b2, &b3);
 	
+		// this is a peer in b3 now. b3 is a dictionary.
 		bencode_dict_get_next(&b3, &b4, &str, &len);
         	if(strncmp(str, "ip", 2) != 0)
        		{
@@ -164,7 +163,7 @@ int pwp_start(char *md_file)
         	}
        		bencode_int_value(&b4, &num);
 		port = (uint16_t)num;
-		// call do_handshake
+		
 		printf("*** Going to process peer: %s:%d\n", ip, port);
 		rv = talk_to_peer(info_hash, our_peer_id, ip, port);
 		if(rv == 1)
@@ -203,6 +202,7 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	struct pwp_peer peer_status;
 	
 	peer_status.unchoked = 0;
+	peer_status.has_pieces = 0;
 	rv = 0;
 	FD_ZERO(&recvfd);
 	tv.tv_sec = 3;
@@ -245,19 +245,25 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	}	
 
 	/*********** RECEIVE HANDSHAKE + BITFIELD + HAVE's (possibly) ***********/
-
-	while((rv = receive_msg(socketfd, 1, &recvfd, &tv, &recvd_msg, &len)) != RECV_NO_MORE_MSGS)
+	do
 	{
+		rv = receive_msg(socketfd, 1, &recvfd, &tv, &recvd_msg, &len);
 		if(rv == -1)
 		{
 			goto cleanup;
 		}
 		process_msgs(recvd_msg, len, 1, &peer_status);
 		free(recvd_msg);
-	}
+	} while(rv != RECV_NO_MORE_MSGS);
+	// check if this peer has any pieces we don't have and then send interested.
+	if(!peer_status.has_pieces)
+	{
+		printf("** Peer has no pieces, so not sending interested.\n");
+		rv = -1;
+		goto cleanup;
+	}	
+
 	/************** SEND INTERESTED ***********************/
-	// TODO: check if this peer has any pieces we don't have and then send interested.
-	
 	msg = compose_interested(&msg_len);
 	
 	if(send(socketfd, msg, msg_len, 0) == -1)
@@ -315,19 +321,22 @@ int receive_msg(int socketfd, int has_hs, fd_set *recvfd, struct timeval *tv, ui
 		rv = select(socketfd + 1, recvfd, NULL, NULL, tv);
         	if(rv == -1)
         	{
+			printf("receive_msg: Error while select()ing.\n");
                 	perror("select");
                 	goto cleanup;
         	}
 	        if(rv == 0)
         	{
-	                fprintf(stderr, "Recv timed out.\n");
+	                printf("receive_msg: Recv timed out.\n");
                 	rv = RECV_NO_MORE_MSGS;
         	        goto cleanup;
 	        }
-
+		// reset rv
+		rv = 0;
         	*len = recv(socketfd, buf, MAX_DATA_LEN, 0);
         	if(*len == -1)
 	        {
+			printf("receive_msg: Error while recv()ing.\n");
         	        perror("recv");
 	                rv = -1;
                 	goto cleanup;
@@ -335,7 +344,7 @@ int receive_msg(int socketfd, int has_hs, fd_set *recvfd, struct timeval *tv, ui
 
 	        if(*len == 0)
         	{
-               		fprintf(stderr, "Remote peer closed connection on handshake.\n");
+               		printf("Remote peer closed connection on handshake.\n");
                 	rv = -1;
         	        goto cleanup;
 	        }
@@ -346,7 +355,7 @@ int receive_msg(int socketfd, int has_hs, fd_set *recvfd, struct timeval *tv, ui
 	
 	} while(!complete);
 
-        printf("Received handshake reply of length %d\n", *len);
+        printf("receive_msg: Received handshake reply of length %d\n", *len);
 cleanup:
 	return rv;
 }
@@ -509,6 +518,7 @@ int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 			case BITFIELD_MSG_ID:
 				// TODO: populate global stats collection
 				printf("*-*-* Got BITFIELD message.\n");
+				peer->has_pieces = 1;
 				break;
 			case UNCHOKE_MSG_ID:
 				peer->unchoked = 1;
@@ -530,6 +540,7 @@ int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 			case HAVE_MSG_ID:
 				// TODO:
 				printf("*-*-* Got HAVE message.\n");
+				peer->has_pieces = 1;
 				break;
 			case REQUEST_MSG_ID:
 				// TODO:
