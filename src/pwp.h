@@ -60,7 +60,7 @@ uint8_t *compose_interested(int *len);
 
 uint8_t extract_msg_id(uint8_t *response);
 int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port);
-int receive_msg(int socketfd, int has_hs, fd_set *recvfd, struct timeval *tv, uint8_t **msg, int *len);
+int receive_msg(int socketfd, int has_hs, fd_set *recvfd, uint8_t **msg, int *len);
 /*
 Checks if the message in buf is a complete bittorrent peer message.
 buf: the message as received from socket
@@ -202,7 +202,6 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	uint16_t peer_port;
 	int len;
 	fd_set recvfd;
-	struct timeval tv;
 	uint8_t *msg;
 	int msg_len;	
 	uint8_t *recvd_msg;
@@ -212,8 +211,6 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	peer_status.has_pieces = 0;
 	rv = 0;
 	FD_ZERO(&recvfd);
-	tv.tv_sec = 3;
-	tv.tv_usec = 0;
 
 	hs = compose_handshake(info_hash, our_peer_id, &hs_len);
 	
@@ -252,15 +249,24 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	}	
 
 	/*********** RECEIVE HANDSHAKE + BITFIELD + HAVE's (possibly) ***********/
+	int temp_hs = 1;
 	do
 	{
-		rv = receive_msg(socketfd, 1, &recvfd, &tv, &recvd_msg, &len);
+		rv = receive_msg(socketfd, temp_hs, &recvfd, &recvd_msg, &len);
 		if(rv == -1)
 		{
 			goto cleanup;
 		}
-		process_msgs(recvd_msg, len, 1, &peer_status);
-		free(recvd_msg);
+		if(rv != RECV_NO_MORE_MSGS)
+		{
+			process_msgs(recvd_msg, len, temp_hs, &peer_status);
+		}
+		if(recvd_msg)
+		{
+			free(recvd_msg);
+			recvd_msg = NULL;
+		}
+		temp_hs = 0;
 	} while(rv != RECV_NO_MORE_MSGS);
 	// check if this peer has any pieces we don't have and then send interested.
 	if(!peer_status.has_pieces)
@@ -285,19 +291,16 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	while(!peer_status.unchoked)
 	{
 		// TODO: refactor this set of lines into it's own method. it's repeated whenever we want to receive messages.
-		rv = receive_msg(socketfd, 0, &recvfd, &tv, &recvd_msg, &len);
+		rv = receive_msg(socketfd, 0, &recvfd, &recvd_msg, &len);
         	if(rv == -1)
         	{
                 	goto cleanup;
         	}	
 		process_msgs(recvd_msg, len, 0, &peer_status);
 		free(recvd_msg);
+		recvd_msg = NULL;
 	}
-	
-	if(peer_status.unchoked)
-        {
-		printf("> UNCHOKED!\n");
-        }
+	rv = 0;
 	
 	// if here then pieces must be populated and we're unchoked too.
 	// TODO: start requesting pieces	
@@ -313,14 +316,17 @@ cleanup:
 }
 
 
-int receive_msg(int socketfd, int has_hs, fd_set *recvfd, struct timeval *tv, uint8_t **msg, int *len)
+int receive_msg(int socketfd, int has_hs, fd_set *recvfd, uint8_t **msg, int *len)
 {
 	int rv = 0;
 	uint8_t buf[MAX_DATA_LEN];
 	int complete = 0, cont_status = CONT_NEW;
 	uint8_t *curr;
 	int rl, is_cont = 0; // remaining length and is continued
+	struct timeval tv;
 
+	tv.tv_sec = 5;
+        tv.tv_usec = 0;
 	*msg = malloc(MAX_DATA_LEN);
 	curr = *msg;
 	if(has_hs)
@@ -329,17 +335,27 @@ int receive_msg(int socketfd, int has_hs, fd_set *recvfd, struct timeval *tv, ui
 	}
 	do
 	{	
-		rv = select(socketfd + 1, recvfd, NULL, NULL, tv);
-        	if(rv == -1)
+		rv = select(socketfd + 1, recvfd, NULL, NULL, &tv);
+        	printf("** receive_msgs: value of 'rv' after select: %d\n", rv);
+
+		if(rv == -1)
         	{
 			printf("receive_msg: Error while select()ing.\n");
                 	perror("select");
                 	goto cleanup;
         	}
-	        if(rv == 0)
+	        if(rv == 0) // i.e. timeout
         	{
-	                printf("receive_msg: Recv timed out.\n");
-                	rv = RECV_NO_MORE_MSGS;
+			if((cont_status == CONT_MSG) || (cont_status == CONT_LEN))
+			{
+				fprintf(stderr, "** receive_msg: recv TIMED OUT with INCOMPLETE msg.\n");
+				rv = -1;
+			}
+			else
+			{
+	                	printf("receive_msg: Recv timed out.\n");
+				rv = RECV_NO_MORE_MSGS;
+			}
         	        goto cleanup;
 	        }
 		// reset rv
@@ -359,13 +375,14 @@ int receive_msg(int socketfd, int has_hs, fd_set *recvfd, struct timeval *tv, ui
                 	rv = -1;
         	        goto cleanup;
 	        }
-	
+		
+		printf("** receive_msg: Received msg of length: %d\n", *len);	
 		memcpy(curr, buf, *len);
 		cont_status = is_complete(curr, *len, cont_status, &rl);
 		curr += *len;
 	} while(cont_status != CONT_COMPLETE);
 
-        printf("receive_msg: Received handshake reply of length %d\n", *len);
+        printf("receive_msg: Received complete msg(s) of length %d\n", *len);
 cleanup:
 	return rv;
 }
@@ -536,6 +553,12 @@ uint8_t extract_msg_id(uint8_t *response)
 
 int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 {
+	if(!msgs)
+	{
+		fprintf(stderr, "ERROR: process_msgs: MSGS is null.\n");
+		return -1;
+	}
+
 	int rv, jump;
 	uint8_t *curr, *temp;
 	curr = msgs;
