@@ -27,7 +27,9 @@
 #define CANCEL_MSG_ID 8
 #define KEEP_ALIVE_MSG_ID 100
 
-#define RECV_NO_MORE_MSGS 1
+#define RECV_OK 0
+#define RECV_TO 1 // normal timeout
+#define RECV_ERROR -1 // error e.g. when received only 2 bytes from the 4 bytes which specify length of msg
 
 #define PIECE_STATUS_NOT_STARTED 0
 #define PIECE_STATUS_STARTED 1
@@ -60,8 +62,9 @@ uint8_t *compose_interested(int *len);
 
 uint8_t extract_msg_id(uint8_t *response);
 int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port);
-int receive_msg(int socketfd, int has_hs, fd_set *recvfd, uint8_t **msg, int *len);
 /*
+int receive_msg(int socketfd, int has_hs, fd_set *recvfd, uint8_t **msg, int *len);
+
 Checks if the message in buf is a complete bittorrent peer message.
 buf: the message as received from socket
 len: length of the message in buf
@@ -69,9 +72,15 @@ cont_status: continuation status of the message. this is one of the CONT_* const
 rl: remaining length. when msg is a continuation then rl is used for input too.
 
 returns: one of the CONT_* constants indicating status
-*/
+
 int is_complete(uint8_t *buf, int len, int cont_status, int *rl);
 int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer);
+*/
+
+int receive_msg(int socketfd, fd_set *recvfd, uint8_t **msg, int *len);
+int receive_msg_hs(int socketfd, fd_set *recvfd, uint8_t **msg, int *len);
+int get_len(int socketfd, fd_set *recvfd, int *len);
+int get_len_hs(int socketfd, fd_set *recvfd, int *len);
 
 int pwp_start(char *md_file)
 {
@@ -249,25 +258,38 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	}	
 
 	/*********** RECEIVE HANDSHAKE + BITFIELD + HAVE's (possibly) ***********/
-	int temp_hs = 1;
+	rv = receive_msg_hs(socketfd, &recvfd, &recvd_msg, &len);
+        if(rv == RECV_ERROR)
+        {
+		goto cleanup;
+        }
+        if(rv != RECV_TO)
+        {
+		process_msgs(recvd_msg, len, 1, &peer_status);
+        }
+        if(recvd_msg)
+        {
+		free(recvd_msg);
+                recvd_msg = NULL;
+        }	
+
 	do
 	{
-		rv = receive_msg(socketfd, temp_hs, &recvfd, &recvd_msg, &len);
-		if(rv == -1)
+		rv = receive_msg(socketfd, &recvfd, &recvd_msg, &len);
+		if(rv == RECV_ERROR)
 		{
 			goto cleanup;
 		}
-		if(rv != RECV_NO_MORE_MSGS)
+		if(rv != RECV_TO)
 		{
-			process_msgs(recvd_msg, len, temp_hs, &peer_status);
+			process_msgs(recvd_msg, len, 0, &peer_status);
 		}
 		if(recvd_msg)
 		{
 			free(recvd_msg);
 			recvd_msg = NULL;
 		}
-		temp_hs = 0;
-	} while(rv != RECV_NO_MORE_MSGS);
+	} while(rv != RECV_TO);
 	// check if this peer has any pieces we don't have and then send interested.
 	if(!peer_status.has_pieces)
 	{
@@ -291,12 +313,12 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	while(!peer_status.unchoked)
 	{
 		// TODO: refactor this set of lines into it's own method. it's repeated whenever we want to receive messages.
-		rv = receive_msg(socketfd, 0, &recvfd, &recvd_msg, &len);
-        	if(rv == -1)
+		rv = receive_msg(socketfd, &recvfd, &recvd_msg, &len);
+        	if(rv == RECV_ERROR)
         	{
                 	goto cleanup;
         	}
-		if(rv == RECV_NO_MORE_MSGS)
+		if(rv == RECV_TO)
 		{
 			goto cleanup;
 		}
@@ -332,7 +354,120 @@ cleanup:
 	return rv;
 }
 
+int receive_msg_hs(int socketfd, fd_set *recvfd, uint8_t **msg, int *len)
+{
+        int rv;
+	uint8_t *curr;
 
+        rv = get_len_hs(socketfd, recvfd, len);
+        if(rv != RECV_OK)
+        {
+                fprintf(stderr, "There was a problem getting length of the message. rv = %d\n", rv);
+                goto cleanup;
+        }
+
+        *msg = malloc(*len);
+	curr = *msg;
+	*curr = (uint8_t)(*len - 8 - 20 - 20);
+	curr++;
+        rv = receive_msg_for_len(socketfd, recvfd, *len, &curr);
+        if(rv != RECV_OK)
+        {
+                fprintf(stderr, "There was a problem getting length of the message. rv = %d\n", rv);
+                rv = RECV_ERROR; // even if it is timeout, at this stage it means error.
+                goto cleanup;
+        }
+
+cleanup:
+        return rv;
+}
+
+int receive_msg(int socketfd, fd_set *recvfd, uint8_t **msg, int *len)
+{
+	int rv, temp;
+	uint8_t *curr;
+
+	rv = get_len(socketfd, recvfd, len);
+	if(rv != RECV_OK)
+	{
+		fprintf(stderr, "There was a problem getting length of the message. rv = %d\n", rv);
+		goto cleanup;
+	}
+
+	*msg = malloc(*len + 4);
+	curr = *msg;
+	temp = htonl(*len);
+	memcpy(curr, &temp, 4);
+	curr += 4;
+	rv = receive_msg_for_len(socketfd, recvfd, *len, &curr);
+	if(rv != RECV_OK)
+	{
+		fprintf(stderr, "There was a problem getting length of the message. rv = %d\n", rv);
+                rv = RECV_ERROR; // even if it is timeout, at this stage it means error.
+		goto cleanup;
+	}
+
+cleanup:
+	return rv;
+}
+
+int get_len(int socketfd, fd_set *recvfd, int *len)
+{
+	int rv;
+	uint8_t *curr = (uint8_t *)len;
+
+	rv = receive_msg_for_len(socketfd, recvfd, 4, &curr);	
+	*len = ntohl(*len);	
+
+	return rv;
+}
+
+int get_len_hs(int socketfd, fd_set *recvfd, int *len)
+{
+        int rv;
+	uint8_t *p_name_len = malloc(1);
+
+        rv = receive_msg_for_len(socketfd, recvfd, 1, &p_name_len);
+
+        *len = *p_name_len + 8 + 20 + 20;
+
+        return rv;
+}
+
+int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t **msg)
+{
+	int r_bytes, rv;
+        uint8_t *curr = *msg;
+	struct timeval tv;
+
+	tv.tv_sec = 5;
+        tv.tv_usec = 0;
+        // TODO: the for-loop to keep receiving until we have received the 4 bytes which specify length.
+        rv = select(socketfd + 1, recvfd, NULL, NULL, &tv);
+        printf("** get_len: value of 'rv' after select: %d\n", rv);
+
+        if(rv == -1)
+        {
+                perror("select");
+                return RECV_ERROR;
+        }
+        if(rv == 0) // i.e. timeout
+        {
+                return RECV_TO;
+        }
+        rv = 0;
+        for(r_bytes = 0; r_bytes<len; r_bytes+=rv)
+        {
+                if((rv = recv(socketfd, curr + r_bytes, len - r_bytes, 0)) <= 0)
+                {
+                        return RECV_ERROR;
+                }
+        }
+
+        return RECV_OK;
+}
+
+/*
 int receive_msg(int socketfd, int has_hs, fd_set *recvfd, uint8_t **msg, int *len)
 {
 	int rv = 0;
@@ -512,6 +647,7 @@ int is_complete(uint8_t *buf, int len, int cont_status, int *rl)
 		len = len - bt_msg_len - 4;
 	}
 }
+*/
 
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len)
 {
