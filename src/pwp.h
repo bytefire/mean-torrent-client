@@ -62,20 +62,6 @@ uint8_t *compose_interested(int *len);
 
 uint8_t extract_msg_id(uint8_t *response);
 int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port);
-/*
-int receive_msg(int socketfd, int has_hs, fd_set *recvfd, uint8_t **msg, int *len);
-
-Checks if the message in buf is a complete bittorrent peer message.
-buf: the message as received from socket
-len: length of the message in buf
-cont_status: continuation status of the message. this is one of the CONT_* constants defined above.
-rl: remaining length. when msg is a continuation then rl is used for input too.
-
-returns: one of the CONT_* constants indicating status
-
-int is_complete(uint8_t *buf, int len, int cont_status, int *rl);
-int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer);
-*/
 
 int receive_msg(int socketfd, fd_set *recvfd, uint8_t **msg, int *len);
 int receive_msg_hs(int socketfd, fd_set *recvfd, uint8_t **msg, int *len);
@@ -182,7 +168,9 @@ int pwp_start(char *md_file)
 		
 		printf("*** Going to process peer: %s:%d\n", ip, port);
 		rv = talk_to_peer(info_hash, our_peer_id, ip, port);
-		if(rv == 1)
+		
+		printf("[LOG] pwp_start: rv from talk_to_peer is %d.\n\n", rv);
+		if(rv == 0)
 		{
 			break;
 		}
@@ -190,12 +178,15 @@ int pwp_start(char *md_file)
 /********** end of what will be while loop for every peer ****************/
 
 cleanup:
+	printf("[LOG] In pwp_start's cleanup.\n");
 	if(metadata)
 	{
+		printf("[LOG] Freeing metadata.\n");
 		free(metadata);
 	}
 	if(ip)
 	{
+		printf("[LOG] Freeing IP.\n");
 		free(ip);
 	}
 	return rv;	
@@ -213,7 +204,7 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	fd_set recvfd;
 	uint8_t *msg;
 	int msg_len;	
-	uint8_t *recvd_msg;
+	uint8_t *recvd_msg = NULL;
 	struct pwp_peer peer_status;
 	
 	peer_status.unchoked = 0;
@@ -250,6 +241,7 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
         }
 
 	/*********** SEND HANDSHAKE ****************/
+	printf("[LOG] Sent handshake.\n");
 	if(send(socketfd, hs, hs_len, 0) == -1)
 	{
 		perror("send");
@@ -259,13 +251,16 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 
 	/*********** RECEIVE HANDSHAKE + BITFIELD + HAVE's (possibly) ***********/
 	rv = receive_msg_hs(socketfd, &recvfd, &recvd_msg, &len);
+	printf("[LOG] rv from receive_msg: %d.\n", rv);
         if(rv == RECV_ERROR)
         {
 		goto cleanup;
         }
         if(rv != RECV_TO)
         {
+		printf("[LOG] Received handshake response of length %d. Going to process it now.\n", len);
 		process_msgs(recvd_msg, len, 1, &peer_status);
+		printf("[LOG] Done pocessing handshake.\n");
         }
         if(recvd_msg)
         {
@@ -276,12 +271,14 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	do
 	{
 		rv = receive_msg(socketfd, &recvfd, &recvd_msg, &len);
+		printf("[LOG] rv from receive_msg: %d.\n", rv);
 		if(rv == RECV_ERROR)
 		{
 			goto cleanup;
 		}
 		if(rv != RECV_TO)
 		{
+			printf("[LOG] Received next msg after HS. Len: %d. Goinf to process it now.\n", len);
 			process_msgs(recvd_msg, len, 0, &peer_status);
 		}
 		if(recvd_msg)
@@ -290,6 +287,8 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 			recvd_msg = NULL;
 		}
 	} while(rv != RECV_TO);
+
+	printf("[LOG] Finished receiving until timeout. Checking if peer has any pieces.\n");
 	// check if this peer has any pieces we don't have and then send interested.
 	if(!peer_status.has_pieces)
 	{
@@ -308,12 +307,13 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
                 goto cleanup;
         }
 
-	printf("Sent interested message.\n");
+	printf("[LOG] Sent interested message. Receiving response now.\n");
 	/******** RECEIVE RESPONSE TO INTERESTED *************/
 	while(!peer_status.unchoked)
 	{
 		// TODO: refactor this set of lines into it's own method. it's repeated whenever we want to receive messages.
 		rv = receive_msg(socketfd, &recvfd, &recvd_msg, &len);
+		printf("[LOG] rv from receive_msg: %d.\n", rv);
         	if(rv == RECV_ERROR)
         	{
                 	goto cleanup;
@@ -323,6 +323,7 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 			goto cleanup;
 		}
 
+		printf("[LOG] Received response for INTERESTED message. Going to process it now.\n");
 		process_msgs(recvd_msg, len, 0, &peer_status);
 		if(recvd_msg)
 		{
@@ -331,23 +332,27 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 		}
 	}
 	rv = 0;
-	
+	printf("[LOG] Peer has unchoked us.\n");	
 	// if here then pieces must be populated and we're unchoked too.
 	// TODO: start requesting pieces	
 
 
 cleanup:
+	printf("[LOG] In cleanup.\n");
 	if(socketfd > 0)
 	{
+		printf("[LOG] Closing socket.\n");
 		close(socketfd);
 	}
 	if(hs)
 	{
+		printf("[LOG] Freeing HS.\n");
 		free(hs);
 		hs = NULL;
 	}
 	if(recvd_msg)
         {
+		printf("[LOG] Freeing recvd_msg.\n");
 		free(recvd_msg);
                 recvd_msg = NULL;
         }
@@ -362,18 +367,18 @@ int receive_msg_hs(int socketfd, fd_set *recvfd, uint8_t **msg, int *len)
         rv = get_len_hs(socketfd, recvfd, len);
         if(rv != RECV_OK)
         {
-                fprintf(stderr, "There was a problem getting length of the message. rv = %d\n", rv);
+                fprintf(stderr, "[LOG] inside receive_msg_hs: get_len_hs didn't return RECV_OK. rv = %d (0=OK; 1=TO; -1=ERROR)\n", rv);
                 goto cleanup;
         }
 
-        *msg = malloc(*len);
+        *msg = malloc(*len + 1);
 	curr = *msg;
 	*curr = (uint8_t)(*len - 8 - 20 - 20);
 	curr++;
         rv = receive_msg_for_len(socketfd, recvfd, *len, &curr);
         if(rv != RECV_OK)
         {
-                fprintf(stderr, "There was a problem getting length of the message. rv = %d\n", rv);
+                fprintf(stderr, "[ERROR] inside receive_msg_hs: receive_msg_for_len didn't return RECV_OK. rv = %d (0=OK; 1=TO; -1=ERROR)\n", rv);
                 rv = RECV_ERROR; // even if it is timeout, at this stage it means error.
                 goto cleanup;
         }
@@ -390,7 +395,7 @@ int receive_msg(int socketfd, fd_set *recvfd, uint8_t **msg, int *len)
 	rv = get_len(socketfd, recvfd, len);
 	if(rv != RECV_OK)
 	{
-		fprintf(stderr, "There was a problem getting length of the message. rv = %d\n", rv);
+		fprintf(stderr, "[LOG] inside receive_msg: get_len didn't return RECV_OK. rv = %d (0=OK; 1=TO; -1=ERROR)\n", rv);
 		goto cleanup;
 	}
 
@@ -402,7 +407,7 @@ int receive_msg(int socketfd, fd_set *recvfd, uint8_t **msg, int *len)
 	rv = receive_msg_for_len(socketfd, recvfd, *len, &curr);
 	if(rv != RECV_OK)
 	{
-		fprintf(stderr, "There was a problem getting length of the message. rv = %d\n", rv);
+		fprintf(stderr, "[ERROR] inside receive_msg: receive_msg_for_len didn't return RECV_OK. rv = %d (0=OK; 1=TO; -1=ERROR)\n", rv);
                 rv = RECV_ERROR; // even if it is timeout, at this stage it means error.
 		goto cleanup;
 	}
@@ -444,7 +449,7 @@ int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t **msg)
         tv.tv_usec = 0;
         // TODO: the for-loop to keep receiving until we have received the 4 bytes which specify length.
         rv = select(socketfd + 1, recvfd, NULL, NULL, &tv);
-        printf("** get_len: value of 'rv' after select: %d\n", rv);
+        printf("[LOG] get_len: value of 'rv' after select: %d (1=OK; 0=timeout; -1=error)\n", rv);
 
         if(rv == -1)
         {
@@ -729,6 +734,7 @@ int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 		memcpy(peer->peer_id, temp, 20);
 		curr += jump + 20;
 		len = len - jump - 20;
+		printf("*-*-* Got HANDSHAKE message.\n");
 	}
 
 	while(len > 0)
