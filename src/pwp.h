@@ -31,15 +31,10 @@
 #define RECV_TO 1 // normal timeout
 #define RECV_ERROR -1 // error e.g. when received only 2 bytes from the 4 bytes which specify length of msg
 
-#define PIECE_STATUS_NOT_STARTED 0
-#define PIECE_STATUS_STARTED 1
-#define PIECE_STATUS_COMPLETE 2
-
-#define CONT_NEW 0
-#define CONT_HS 1 // handshake
-#define CONT_MSG 2 // message continuation
-#define CONT_LEN 3 // the 4 bytes containing length of a peer wire protocol message
-#define CONT_COMPLETE 4 // the message was complete
+#define PIECE_STATUS_NOT_AVAILABLE 0
+#define PIECE_STATUS_AVAILABLE 1
+#define PIECE_STATUS_STARTED 2
+#define PIECE_STATUS_COMPLETE 3 
 
 struct pwp_peer
 {
@@ -56,6 +51,7 @@ struct pwp_piece
 
 struct pwp_piece *pieces = NULL;
 long int piece_length = -1;
+long int num_of_pieces = -1;
 
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len);
 uint8_t *compose_interested(int *len);
@@ -67,6 +63,12 @@ int receive_msg(int socketfd, fd_set *recvfd, uint8_t **msg, int *len);
 int receive_msg_hs(int socketfd, fd_set *recvfd, uint8_t **msg, int *len);
 int get_len(int socketfd, fd_set *recvfd, int *len);
 int get_len_hs(int socketfd, fd_set *recvfd, int *len);
+int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer);
+int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t **msg);
+int process_have(uint8_t *msg, struct pwp_peer *peer);
+int process_bitfield(uint8_t *msg, struct pwp_peer *peer); 
+int choose_random_piece_idx();
+int download_piece(int idx);
 
 int pwp_start(char *md_file)
 {
@@ -117,9 +119,9 @@ int pwp_start(char *md_file)
                 fprintf(stderr, "Failed to find 'num_of_pieces' in metadata file.\n");
                 goto cleanup;
         }
-        bencode_int_value(&b2, &num);
-	pieces = malloc(sizeof(struct pwp_piece) * num);
-	bzero(pieces, sizeof(struct pwp_piece) * num);
+        bencode_int_value(&b2, &num_of_pieces);
+	pieces = malloc(sizeof(struct pwp_piece) * num_of_pieces);
+	bzero(pieces, sizeof(struct pwp_piece) * num_of_pieces);
 
 	bencode_dict_get_next(&b1, &b2, &str, &len);
         if(strncmp(str, "piece_length", 12) != 0)
@@ -471,189 +473,7 @@ int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t **msg)
 
         return RECV_OK;
 }
-
-/*
-int receive_msg(int socketfd, int has_hs, fd_set *recvfd, uint8_t **msg, int *len)
-{
-	int rv = 0;
-	uint8_t buf[MAX_DATA_LEN];
-	int complete = 0, cont_status = CONT_NEW;
-	uint8_t *curr;
-	int rl, is_cont = 0; // remaining length and is continued
-	struct timeval tv;
-
-	tv.tv_sec = 5;
-        tv.tv_usec = 0;
-	*msg = malloc(MAX_DATA_LEN);
-	curr = *msg;
-	if(has_hs)
-	{
-		cont_status = CONT_HS;
-	}
-	do
-	{	
-		rv = select(socketfd + 1, recvfd, NULL, NULL, &tv);
-        	printf("** receive_msgs: value of 'rv' after select: %d\n", rv);
-
-		if(rv == -1)
-        	{
-			printf("receive_msg: Error while select()ing.\n");
-                	perror("select");
-                	goto cleanup;
-        	}
-	        if(rv == 0) // i.e. timeout
-        	{
-			if((cont_status == CONT_MSG) || (cont_status == CONT_LEN))
-			{
-				fprintf(stderr, "** receive_msg: recv TIMED OUT with INCOMPLETE msg.\n");
-				rv = -1;
-			}
-			else
-			{
-	                	printf("receive_msg: Recv timed out.\n");
-				rv = RECV_NO_MORE_MSGS;
-			}
-        	        goto cleanup;
-	        }
-		// reset rv
-		rv = 0;
-        	*len = recv(socketfd, buf, MAX_DATA_LEN, 0);
-        	if(*len == -1)
-	        {
-			printf("receive_msg: Error while recv()ing.\n");
-        	        perror("recv");
-	                rv = -1;
-                	goto cleanup;
-        	}
-
-	        if(*len == 0)
-        	{
-               		printf("Remote peer closed connection on handshake.\n");
-                	rv = -1;
-        	        goto cleanup;
-	        }
 		
-		printf("** receive_msg: Received msg of length: %d\n", *len);	
-		memcpy(curr, buf, *len);
-		cont_status = is_complete(curr, *len, cont_status, &rl);
-		curr += *len;
-	} while(cont_status != CONT_COMPLETE);
-
-        printf("receive_msg: Received complete msg(s) of length %d\n", *len);
-cleanup:
-	return rv;
-}
-
-
-int is_complete(uint8_t *buf, int len, int cont_status, int *rl)
-{
-	int bt_msg_len;
-	int m_rl; // rl = remaining length
-
-	m_rl = 0;
-
-	// handle situation if length of BT message was broken up
-	if(cont_status == CONT_LEN)
-	{
-		// if here then 4 bytes must be like this: 
-		// 	bytes 0 to 2: bytes from previous msg in the same order as the msg (i.e. network order)
-		// 	byte 3: number of bytes remaining to complete the 4 bytes of msg len
-		
-		uint8_t *curr = (uint8_t *)rl;
-		m_rl = (int)(*(curr + 3));
-		if(len < m_rl)
-		{
-			// copy whatever bytes are available and update last byte of rl.
-			memcpy(curr + 4 - m_rl, buf, len);
-			m_rl = m_rl - len;
-			uint8_t temp_len = (uint8_t)m_rl;
-			memcpy(curr + 3, &temp_len, 1);
-			return CONT_LEN;
-		}
-		else
-		{
-			// else copy the length into rl and do the ntohl conversion.
-			// reset things for normal continuation further below.
-			memcpy(curr + 4 - m_rl, buf, m_rl);
-			len = len - m_rl;
-			buf += m_rl;
-			m_rl = ntohl(*rl);
-			*rl = m_rl;
-			cont_status = CONT_MSG;
-		}
-	}
-	
-	if(cont_status == CONT_HS) // if the message contains handshake then hs must be at start.
-	{
-		m_rl += (uint8_t)(*buf); // length of protocol name, at the moment 19.
-		m_rl += 1 + 8 + 20 + 20; // + length byte + 8 reserved + info hash + our peer id
-		
-		// 3 possibilities of relative values of hs_jump and len (>,=,<)
-		if(m_rl > len)
-		{
-			*rl = m_rl - len;
-			return CONT_MSG;
-		}
-		if(m_rl == len)
-		{
-			*rl = 0;
-			return CONT_COMPLETE;
-		}
-		// if here then hs_jump < len
-		buf += m_rl;
-		len = len - m_rl;
-	}
-
-	m_rl = *rl;
-	if(cont_status == CONT_MSG) // i.e. continuation of an existing message
-	{
-	// 3 possibilities: len < rl (incomplete msg), len == rl (complete msg and nothing more), len > rl (complete msg and some more)
-		if(len < m_rl)
-		{
-			*rl = m_rl - len;
-			return CONT_MSG;
-		}
-
-		if(len == m_rl)
-		{
-			*rl = 0;
-			return CONT_COMPLETE;
-		}
-		// here means len > m_rl
-		buf += m_rl;
-		len = len - m_rl;
-	}
-
-	while(1)
-	{
-		if(len < 4)
-		{
-			// copy whatever bytes are available and update last byte of rl.
-			uint8_t *curr = (uint8_t *)rl;
-                        memcpy(curr, buf, len);
-                        uint8_t temp_len = (uint8_t)(4 - len);
-                        memcpy(curr + 3, &temp_len, 1);
-                        return CONT_LEN;
-		}
-		bt_msg_len = ntohl( (*(int *)buf));
-		
-		if(bt_msg_len + 4 == len)
-		{
-			*rl = 0;
-			return CONT_COMPLETE;
-		}
-		if(bt_msg_len + 4 > len)
-		{
-			*rl = bt_msg_len + 4 - len;
-			return CONT_MSG;
-		}
-		// if here then there is another msg in buf
-		buf += bt_msg_len + 4;
-		len = len - bt_msg_len - 4;
-	}
-}
-*/
-
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len)
 {
 	uint8_t *hs, *curr;
@@ -745,6 +565,7 @@ int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 			case BITFIELD_MSG_ID:
 				// TODO: populate global stats collection
 				printf("*-*-* Got BITFIELD message.\n");
+				process_bitfield(temp, peer);
 				peer->has_pieces = 1;
 				break;
 			case UNCHOKE_MSG_ID:
@@ -767,14 +588,16 @@ int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 			case HAVE_MSG_ID:
 				// TODO:
 				printf("*-*-* Got HAVE message.\n");
+				process_have(temp, peer);
 				peer->has_pieces = 1;
 				break;
 			case REQUEST_MSG_ID:
 				// TODO:
+				printf("*-*-* Got REQUEST message.\n");
 				break;
 			case PIECE_MSG_ID:
 				// TODO:
-				printf("*-*-* Got REQUEST message.\n");
+				printf("*-*-* Got PIECE message.\n");
 				break;
 			case CANCEL_MSG_ID:
 				// TODO:
@@ -797,4 +620,113 @@ int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 
 cleanup:
 	return rv;
+}
+
+int download_piece(int idx)
+{
+    /* TODO:
+    1. Calculate number of blocks in this piece (2^14 (16384) bytes per block )
+    2. malloc an array 'blocks' of struct pwp_block for this piece 
+    3. initialise each pwp_block in the blocks array
+    LOOP:
+        4. create three REQUEST messages for three blocks which don't have status DOWNLOADED. if no such block then break the loop
+        5. receive PIECE msgs and save data (write different method for piece messages, not receive_msg)
+        6. keep receiving until timeout.
+        7. update 'blocks' array
+        8. go to step 4
+    END OF LOOP
+    9. compute sha1 of downloaded piece
+    10. verify the sha1 with the one in announce file. (or metada file?)
+    11. return 0 or -1 accordingly.
+    */
+	return 0;
+} 
+
+int process_bitfield(uint8_t *msg, struct pwp_peer *peer)
+{
+    uint8_t *curr = msg;
+    int i, j, rv, idx;
+    uint8_t bits, mask;
+      
+    rv = 0;
+    // read bitfield, parse it and populate pieces array accordingly.
+    int len = ntohl((int)(*curr));
+    curr += 5; // get to start of bitfield.
+      
+    for(i=0; i<len; i++)
+    {
+        bits = *(curr + i);
+        mask = 0x80;
+        for(j=0; j<8; j++)
+        {
+            if(bits & mask)
+            {
+                idx = i*8 + j;
+                if(idx >= num_of_pieces)
+                {
+                    fprintf(stderr, "[ERROR] Bitfield has more bits set than there are number of pieces.\n");
+                    rv = -1;
+                    // TODO: Reset all pieces that were set to available for this particular peer.
+                    goto cleanup;
+                }
+                if(pieces[idx].status == PIECE_STATUS_NOT_AVAILABLE)
+                {
+                    pieces[idx].status = PIECE_STATUS_AVAILABLE;
+                    pieces[idx].peer = peer;
+                }
+            }
+            mask = mask / 2;
+        }
+    }
+
+cleanup:
+    return rv;
+}
+  
+int process_have(uint8_t *msg, struct pwp_peer *peer)
+{
+    int rv = 0;
+    uint8_t *curr = msg;
+    int idx = ntohl((int)(*(curr+5)));
+      
+    if(pieces[idx].status == PIECE_STATUS_NOT_AVAILABLE)
+    {
+        pieces[idx].status = PIECE_STATUS_AVAILABLE;
+        pieces[idx].peer = peer;
+    }
+
+    return rv;
+} 
+
+int choose_random_piece_idx()
+{
+    int i, r, random_piece_idx;
+      
+    random_piece_idx = -1;
+    srand(time(NULL));
+      
+    for(i=0; i<10; i++) // 10 attempts at getting a random available piece
+    {
+        r = rand() % num_of_pieces;
+        if(pieces[r].status == PIECE_STATUS_AVAILABLE)
+        {
+            random_piece_idx = r;
+            break;
+        }
+    }
+      
+    // if no piece found after random attempts then go sequentially
+    if(random_piece_idx == -1)
+    {
+        for(i=0; i<num_of_pieces; i++)
+        {
+            if(pieces[i].status == PIECE_STATUS_AVAILABLE)
+            {
+                random_piece_idx = i;
+                break;
+            }
+        }
+    }
+      
+    return random_piece_idx;
 }
