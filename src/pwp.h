@@ -36,6 +36,10 @@
 #define PIECE_STATUS_STARTED 2
 #define PIECE_STATUS_COMPLETE 3 
 
+#define BLOCK_LEN 16384 // i.e. 2^14 which is commonly used
+#define BLOCK_STATUS_NOT_DOWNLOADED 0
+#define BLOCK_STATUS_DOWNLOADED 1 
+
 struct pwp_peer
 {
         uint8_t peer_id[20]; // TODO: should this be uint8_t peer_id[20]?
@@ -49,8 +53,15 @@ struct pwp_piece
 	uint8_t status;
 };
 
+struct pwp_block
+{
+    int offset;
+    int length;
+    uint8_t status;
+};
+
 struct pwp_piece *pieces = NULL;
-long int piece_length = -1;
+long int piece_len = -1;
 long int num_of_pieces = -1;
 
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len);
@@ -130,7 +141,7 @@ int pwp_start(char *md_file)
                 fprintf(stderr, "Failed to find 'piece_length' in metadata file.\n");
                 goto cleanup;
         }
-        bencode_int_value(&b2, &piece_length);
+        bencode_int_value(&b2, &piece_len);
         
 	bencode_dict_get_next(&b1, &b2, &str, &len);
         if(strncmp(str, "peers", 5) != 0)
@@ -639,6 +650,19 @@ int download_piece(int idx)
     10. verify the sha1 with the one in announce file. (or metada file?)
     11. return 0 or -1 accordingly.
     */
+
+// No 1 above:
+	int num_of_blocks = piece_len / BLOCK_LEN;
+	int bytes_in_last_block = piece_len % BLOCK_LEN;
+
+	if(bytes_in_last_block)
+	{
+		num_of_blocks += 1;
+	}
+// No 2 above:
+	struct pwp_block *blocks = malloc(num_of_blocks * sizeof(struct pwp_block));
+// No 3 above:
+
 	return 0;
 } 
 
