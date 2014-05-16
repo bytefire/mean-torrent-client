@@ -66,6 +66,7 @@ long int num_of_pieces = -1;
 
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len);
 uint8_t *compose_interested(int *len);
+uint8_t *compose_request(int piece_idx, int block_offset, int block_length, int *len);
 
 uint8_t extract_msg_id(uint8_t *response);
 int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port);
@@ -79,7 +80,9 @@ int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t **msg);
 int process_have(uint8_t *msg, struct pwp_peer *peer);
 int process_bitfield(uint8_t *msg, struct pwp_peer *peer); 
 int choose_random_piece_idx();
-int download_piece(int idx);
+int download_piece(int idx, int socketfd, struct pwp_peer *peer);
+uint8_t *prepare_requests(int piece_idx, struct pwp_block *blocks, int num_of_blocks, int max_requests, int *len);
+int receive_and_process_piece_msgs(int socketfd, struct pwp_peer *peer)
 
 int pwp_start(char *md_file)
 {
@@ -424,6 +427,7 @@ int receive_msg(int socketfd, fd_set *recvfd, uint8_t **msg, int *len)
                 rv = RECV_ERROR; // even if it is timeout, at this stage it means error.
 		goto cleanup;
 	}
+	*len += 4;
 
 cleanup:
 	return rv;
@@ -633,7 +637,7 @@ cleanup:
 	return rv;
 }
 
-int download_piece(int idx)
+int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 {
     /* TODO:
     1. Calculate number of blocks in this piece (2^14 (16384) bytes per block )
@@ -651,6 +655,8 @@ int download_piece(int idx)
     11. return 0 or -1 accordingly.
     */
 
+	int i, len;
+	uint8_t *requests;
 // No 1 above:
 	int num_of_blocks = piece_len / BLOCK_LEN;
 	int bytes_in_last_block = piece_len % BLOCK_LEN;
@@ -662,9 +668,149 @@ int download_piece(int idx)
 // No 2 above:
 	struct pwp_block *blocks = malloc(num_of_blocks * sizeof(struct pwp_block));
 // No 3 above:
+	struct pwp_block *curr = blocks;
+	for(i = 0; i<num_of_blocks; i++)
+	{
+		curr[i].offset = i * BLOCK_LEN;
+		curr[i].length = BLOCK_LEN;
+		curr[i].status = BLOCK_STATUS_NOT_DOWNLOADED;
+	}
+	if(bytes_in_last_block)
+	{
+		curr[num_of_blocks-1].length = bytes_in_last_block;
+	}
 
+// No 4 to 8 above:
+	requests = prepare_requests(idx, blocks, num_of_blocks, 3, &len);
+	while(requests)
+	{
+		if(send(socketfd, requests, len, 0) == -1)
+        	{
+		        perror("send");
+		        rv = -1;
+		        goto cleanup;
+        	}
+		printf("[LOG] Sent piece requests. Receiving response now.\n");
+		receive_and_process_piece_msgs(socketfd, peer);
+		
+		free(requests);
+		requests = prepare_requests(idx, blocks, num_of_blocks, 3, &len);
+	}
+	
 	return 0;
 } 
+
+int receive_and_process_piece_msgs(int socketfd, struct pwp_peer *peer)
+{
+	uint8_t *msg, *temp;
+	int rv, len;
+	uint8_t msg_id;
+	fd_set recvfd;
+	
+	msg = NULL;
+	msg_id = 255;
+	FD_ZERO(&recvfd);
+	FD_SET(socketfd, &recvfd);
+	// NOTE: cannot call receive_msg method above because piece msg will be too long to hold in memory.
+	while(msg_id != PIECE_MSG_ID)
+	{
+		rv = receive_msg_for_len(socketfd, &recvfd, 4, &msg); 
+		
+		if(rv != RECV_OK)
+		{
+			goto cleanup;
+		}
+		if(*((int *)msg) == 0)
+		{
+			msg_id = KEEP_ALIVE_MSG_ID;
+			continue;
+		}
+		len = ntohl(*((int *)msg));
+		
+		rv = receive_msg_for_len(socketfd, &recvfd, 1, &msg); 
+		if(rv != RECV_OK)
+		{
+			goto cleanup;
+		}
+		msg_id = *msg;
+		if(msg_id != PIECE_MSG_ID)
+		{
+			temp = malloc(len + 4);
+			rv = receive_msg_for_len(socketfd, &recvfd, len, &msg); 
+			if(rv != RECV_OK)
+			{
+				goto cleanup;
+			}
+			len = htonl(len);
+			memcpy(temp, &len, 4);
+			memcpy(temp + 4, &msg_id, 1);
+			memcpy(temp + 5, msg, ntohl(len));
+			free(msg);			
+			process_msgs(temp, len, 0, peer);
+			free(temp);
+		}
+	}
+	// TODO: process the piece message: len = num of bytes in piece + 1 (for msg id) & msg_id = PIECE_MSG_ID
+	//	have a global file descriptor to the file that already has the total memory required
+	//	using piece length and idx and block offset calculate position of bytes to store inside that file
+	//	save the bytes in file and mark that block's status as BLOCK_DOWNLOADED
+cleanup:
+	if(msg)
+	{
+		free(msg);
+	}
+	return rv;
+}
+
+uint8_t *prepare_requests(int piece_idx, struct pwp_block *blocks, int num_of_blocks, int max_requests, int *len)
+{
+	int i, count;
+	int msg_len = 17; // 17 = length of request message
+	uint8_t *requests = malloc(msg_len * max_requests); 
+	uint8_t *curr;
+	// find up to max_request blocks which are not downloaded.
+	count = 0;
+	*len = 0;
+	for(i=0; i<num_of_blocks; i++)
+	{
+		if(blocks[i].status == BLOCK_STATUS_NOT_DOWNLOADED)
+		{
+			curr = compose_request(piece_idx, blocks[i].offset, blocks[i].length, &msg_len);
+			memcpy(requests+(count * msg_len), curr, msg_len);
+			free(curr);
+			*len += msg_len;
+			count++;
+			if(count == max_requests)
+			{
+				break;
+			}
+		}
+	}
+	if(count == 0)
+	{
+		free(requests);
+		return NULL;
+	}
+	
+	return requests;
+}
+uint8_t *compose_request(int piece_idx, int block_offset, int block_length, int *len)
+{
+	*len = 17; // 4 (msg len) + 1 (msg id) + 4 (piece idx) + 4 (block offset) + 4 (block length)
+	uint8_t *msg = malloc(*len); 
+	int temp = htonl(12);
+	uint8_t msg_id = REQUEST_MSG_ID;
+	memcpy(msg, &temp, 4);
+	memcpy(msg+4, &msg_id, 1);
+	temp = htonl(piece_idx);
+	memcpy(msg+5, &temp, 4);
+	temp = htonl(block_offset);
+	memcpy(msg+9, &temp, 4);
+	temp = htonl(block_length);
+	memcpy(msg+13, &temp, 4);
+	
+	return msg;
+}
 
 int process_bitfield(uint8_t *msg, struct pwp_peer *peer)
 {
