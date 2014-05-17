@@ -63,7 +63,7 @@ struct pwp_block
 };
 
 struct pwp_piece *pieces = NULL;
-long int piece_len = -1;
+long int piece_length = -1;
 long int num_of_pieces = -1;
 FILE *savedfp = NULL;
 
@@ -83,9 +83,10 @@ int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t **msg);
 int process_have(uint8_t *msg, struct pwp_peer *peer);
 int process_bitfield(uint8_t *msg, struct pwp_peer *peer); 
 int choose_random_piece_idx();
+int get_pieces(int socketfd, struct pwp_peer *peer);
 int download_piece(int idx, int socketfd, struct pwp_peer *peer);
 uint8_t *prepare_requests(int piece_idx, struct pwp_block *blocks, int num_of_blocks, int max_requests, int *len);
-int download_block(int socketfd, int expected_piece_idx, struct *pwp_block block, struct pwp_peer *peer);
+int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block, struct pwp_peer *peer);
 
 int pwp_start(char *md_file)
 {
@@ -147,7 +148,7 @@ int pwp_start(char *md_file)
                 fprintf(stderr, "Failed to find 'piece_length' in metadata file.\n");
                 goto cleanup;
         }
-        bencode_int_value(&b2, &piece_len);
+        bencode_int_value(&b2, &piece_length);
 	// TODO: create a file whose size is num_of_pieces * piece_length        
 	savedfp = util_create_file_of_size(SAVED_FILE_PATH, num_of_pieces * piece_length);
 	if(!savedfp)
@@ -367,7 +368,7 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	printf("[LOG] Peer has unchoked us.\n");	
 	// if here then pieces must be populated and we're unchoked too.
 	// TODO: start requesting pieces	
-
+	rv = get_pieces(socketfd, &peer_status);
 
 cleanup:
 	printf("[LOG] In cleanup.\n");
@@ -653,6 +654,14 @@ cleanup:
 	return rv;
 }
 
+int get_pieces(int socketfd, struct pwp_peer *peer)
+{
+	int idx = choose_random_piece_idx();
+	int rv = download_piece(idx, socketfd, peer);
+
+	return rv;	
+}
+
 int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 {
     /* TODO:
@@ -675,8 +684,8 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 	uint8_t *requests;
 	struct pwp_block received_block;
 // No 1 above:
-	int num_of_blocks = piece_len / BLOCK_LEN;
-	int bytes_in_last_block = piece_len % BLOCK_LEN;
+	int num_of_blocks = piece_length / BLOCK_LEN;
+	int bytes_in_last_block = piece_length % BLOCK_LEN;
 
 	if(bytes_in_last_block)
 	{
@@ -738,7 +747,7 @@ cleanup:
 	return 0;
 } 
 
-int download_block(int socketfd, int expected_piece_idx, struct *pwp_block block, struct pwp_peer *peer)
+int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block, struct pwp_peer *peer)
 {
 	uint8_t *msg, *temp;
 	int rv, len;
@@ -829,9 +838,10 @@ int download_block(int socketfd, int expected_piece_idx, struct *pwp_block block
 	block->offset = block_offset;
 	printf("[LOG] *-*-*- Going to receive piece_idx: %d, block_offset: %d, block length: %d.\n", piece_idx, block_offset, remaining);
 
-	int file_pos = (piece_idx * piece_len) + block_offset;
+	fseek(savedfp, (piece_idx * piece_length) + block_offset, SEEK_SET);
 	len = 2048; //use len as buffer for following loop	
 
+	int bytes_saved = 0;
 	while(remaining)
 	{
 		if(remaining < len)
@@ -842,12 +852,14 @@ int download_block(int socketfd, int expected_piece_idx, struct *pwp_block block
 		rv = receive_msg_for_len(socketfd, &recvfd, 4, &msg);
         	if(rv != RECV_OK)
 	        {
-                	fprintf(stderr, "[ERROR] receive_and_process_piece_msgs(): Failed to receive block data. file_pos= %d.\n", file_pos);
+                	fprintf(stderr, "[ERROR] receive_and_process_piece_msgs(): Failed to receive block data. bytes_saved= %d.\n", bytes_saved);
 			rv = RECV_ERROR;
         	        goto cleanup;
 	        }
-		util_write_at_pos(savedfp, file_pos, msg, len);
+	        fwrite(msg, 1, len, savedfp);
+
 		remaining -= len;
+		bytes_saved += len;
 		free(msg);
 		msg = NULL;
 	}

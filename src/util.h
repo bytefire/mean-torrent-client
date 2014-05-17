@@ -92,5 +92,4 @@ FILE *util_create_file_of_size(const char *file_name, long bytes)
 	fputc('\n', fp);
 	return fp;
 }
-
 #endif // UTIL_H
