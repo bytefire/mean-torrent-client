@@ -79,7 +79,7 @@ int receive_msg_hs(int socketfd, fd_set *recvfd, uint8_t **msg, int *len);
 int get_len(int socketfd, fd_set *recvfd, int *len);
 int get_len_hs(int socketfd, fd_set *recvfd, int *len);
 int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer);
-int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t **msg);
+int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t *msg);
 int process_have(uint8_t *msg, struct pwp_peer *peer);
 int process_bitfield(uint8_t *msg, struct pwp_peer *peer); 
 int choose_random_piece_idx();
@@ -90,6 +90,8 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 
 int pwp_start(char *md_file)
 {
+printf(">>>>>>>>>>>>>>>>>>> START:  PWP_START **************************\n");
+
 	uint8_t *metadata;
 	const char *str;
 	int len;
@@ -206,7 +208,7 @@ int pwp_start(char *md_file)
 /********** end of what will be while loop for every peer ****************/
 
 cleanup:
-	printf("[LOG] In pwp_start's cleanup.\n");
+	printf("*********************** EXIING PWP_START **************************\n");
 	if(metadata)
 	{
 		printf("[LOG] Freeing metadata.\n");
@@ -227,6 +229,8 @@ cleanup:
 
 int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port)
 {
+	printf(">>>>>>>>>>>>>>>>>>> START:  TALK_TO_PEER **************************\n");
+
 	int rv;
 	int hs_len;
 	uint8_t *hs;
@@ -408,7 +412,7 @@ int receive_msg_hs(int socketfd, fd_set *recvfd, uint8_t **msg, int *len)
 	curr = *msg;
 	*curr = (uint8_t)(*len - 8 - 20 - 20);
 	curr++;
-        rv = receive_msg_for_len(socketfd, recvfd, *len, &curr);
+        rv = receive_msg_for_len(socketfd, recvfd, *len, curr);
         if(rv != RECV_OK)
         {
                 fprintf(stderr, "[ERROR] inside receive_msg_hs: receive_msg_for_len didn't return RECV_OK. rv = %d (0=OK; 1=TO; -1=ERROR)\n", rv);
@@ -417,11 +421,13 @@ int receive_msg_hs(int socketfd, fd_set *recvfd, uint8_t **msg, int *len)
         }
 
 cleanup:
+	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  TALK_TO_PEER **************************\n");
         return rv;
 }
 
 int receive_msg(int socketfd, fd_set *recvfd, uint8_t **msg, int *len)
 {
+	printf(">>>>>>>>>>>>>>>>>>> START:  RECEIVE_MSG**************************\n");
 	int rv, temp;
 	uint8_t *curr;
 
@@ -437,7 +443,7 @@ int receive_msg(int socketfd, fd_set *recvfd, uint8_t **msg, int *len)
 	temp = htonl(*len);
 	memcpy(curr, &temp, 4);
 	curr += 4;
-	rv = receive_msg_for_len(socketfd, recvfd, *len, &curr);
+	rv = receive_msg_for_len(socketfd, recvfd, *len, curr);
 	if(rv != RECV_OK)
 	{
 		fprintf(stderr, "[ERROR] inside receive_msg: receive_msg_for_len didn't return RECV_OK. rv = %d (0=OK; 1=TO; -1=ERROR)\n", rv);
@@ -447,39 +453,51 @@ int receive_msg(int socketfd, fd_set *recvfd, uint8_t **msg, int *len)
 	*len += 4;
 
 cleanup:
+	printf("*********************** EXIING RECEIVE_MSG **************************\n");
 	return rv;
 }
 
 int get_len(int socketfd, fd_set *recvfd, int *len)
 {
+	printf(">>>>>>>>>>>>>>>>>>> START:  GET_LEN **************************\n");
+	
 	int rv;
 	uint8_t *curr = (uint8_t *)len;
 
-	rv = receive_msg_for_len(socketfd, recvfd, 4, &curr);	
+	rv = receive_msg_for_len(socketfd, recvfd, 4, curr);	
 	*len = ntohl(*len);	
 
+	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  GET_LEN **************************\n");
 	return rv;
 }
 
 int get_len_hs(int socketfd, fd_set *recvfd, int *len)
 {
+	printf(">>>>>>>>>>>>>>>>>>> START:  GET_LEN_HS **************************\n");
         int rv;
 	uint8_t *p_name_len = malloc(1);
 
-        rv = receive_msg_for_len(socketfd, recvfd, 1, &p_name_len);
+        rv = receive_msg_for_len(socketfd, recvfd, 1, p_name_len);
 
         *len = *p_name_len + 8 + 20 + 20;
 
+	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  GET_LEN_HS **************************\n");
         return rv;
 }
 
-int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t **msg)
+int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t *msg)
 {
+	printf(">>>>>>>>>>>>>>>>>>> START:  RECEIVE_MSG_FOR_LEN **************************\n");
+	
+	if(len == 0)
+	{
+		return RECV_OK;
+	}
 	int r_bytes, rv;
-        uint8_t *curr = *msg;
+        uint8_t *curr = msg;
 	struct timeval tv;
 
-	tv.tv_sec = 5;
+	tv.tv_sec = 10;
         tv.tv_usec = 0;
         // TODO: the for-loop to keep receiving until we have received the 4 bytes which specify length.
         rv = select(socketfd + 1, recvfd, NULL, NULL, &tv);
@@ -503,11 +521,14 @@ int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t **msg)
                 }
         }
 
+	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  RECEIVE_MSG_FOR_LEN **************************\n");
         return RECV_OK;
 }
 		
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len)
 {
+	printf(">>>>>>>>>>>>>>>>>>> START:  COMPOSE_HANDSHAKE **************************\n");
+	
 	uint8_t *hs, *curr;
 	uint8_t temp;
 	int i;
@@ -530,11 +551,13 @@ uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len)
 	curr += 20;
 	memcpy(curr, our_peer_id, 20);
 
+	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  COMPOSE_HANDSHAKE **************************\n");
 	return hs;
 }
 
 uint8_t *compose_interested(int *len)
 {
+	printf(">>>>>>>>>>>>>>>>>>> START:  COMPOSE_INTERESTED **************************\n");
 	int l;
 	uint8_t *msg, *curr;
 	uint8_t msg_id = 2; // message if for interested is 2
@@ -548,21 +571,26 @@ uint8_t *compose_interested(int *len)
 	curr += 4;
 	memcpy(curr, &msg_id, 1);
 
+	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  COMPOSE_INTERESTED **************************\n");
 	return msg;
 }
 
 uint8_t extract_msg_id(uint8_t *response)
 {
+	printf(">>>>>>>>>>>>>>>>>>> START:  EXTRACT_MSG_ID **************************\n");
 	if((*(int *)response) == 0) //if length is zero then keep alive msg
 	{
 		return KEEP_ALIVE_MSG_ID;
 	}
 	uint8_t msg_id = response[4];
+
+	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  EXTRACT_MSG_ID **************************\n");
 	return msg_id;
 }
 
 int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 {
+	printf(">>>>>>>>>>>>>>>>>>> START:  PROCESS_MSGS **************************\n");
 	if(!msgs)
 	{
 		fprintf(stderr, "ERROR: process_msgs: MSGS is null.\n");
@@ -651,19 +679,23 @@ int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 	}
 
 cleanup:
+	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  PROCESS_MSGS **************************\n");
 	return rv;
 }
 
 int get_pieces(int socketfd, struct pwp_peer *peer)
 {
+	printf(">>>>>>>>>>>>>>>>>>> START:  GET_PIECES **************************\n");
 	int idx = choose_random_piece_idx();
 	int rv = download_piece(idx, socketfd, peer);
 
+	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  GET_PIECES **************************\n");
 	return rv;	
 }
 
 int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 {
+	printf(">>>>>>>>>>>>>>>>>>> START:  DOWNLOAD_PIECE **************************\n");
     /* TODO:
     1. Calculate number of blocks in this piece (2^14 (16384) bytes per block )
     2. malloc an array 'blocks' of struct pwp_block for this piece 
@@ -740,6 +772,7 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 	
 
 cleanup:
+	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  DOWNLOAD_PIECE **************************\n");
 	if(requests)
 	{
 		free(requests);
@@ -749,6 +782,8 @@ cleanup:
 
 int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block, struct pwp_peer *peer)
 {
+
+	printf(">>>>>>>>>>>>>>>>>>> START:  DOWNLOAD BLOCK **************************\n");
 	uint8_t *msg, *temp;
 	int rv, len;
 	uint8_t msg_id;
@@ -759,10 +794,12 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 	msg_id = 255;
 	FD_ZERO(&recvfd);
 	FD_SET(socketfd, &recvfd);
+	msg = malloc(MAX_DATA_LEN);
 	// NOTE: cannot call receive_msg method above because piece msg will be too long to hold in memory.
 	while(msg_id != PIECE_MSG_ID)
 	{
-		rv = receive_msg_for_len(socketfd, &recvfd, 4, &msg); 
+		printf("[LOG] Going to get length of message. calling receive_msg_for_len().\n");
+		rv = receive_msg_for_len(socketfd, &recvfd, 4, msg); 
 		
 		if(rv != RECV_OK)
 		{
@@ -775,7 +812,8 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 		}
 		len = ntohl(*((int *)msg));
 		
-		rv = receive_msg_for_len(socketfd, &recvfd, 1, &msg); 
+		
+		rv = receive_msg_for_len(socketfd, &recvfd, 1, msg); 
 		if(rv != RECV_OK)
 		{
 			rv = RECV_ERROR;
@@ -785,7 +823,7 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 		if(msg_id != PIECE_MSG_ID)
 		{
 			temp = malloc(len + 4);
-			rv = receive_msg_for_len(socketfd, &recvfd, len, &msg); 
+			rv = receive_msg_for_len(socketfd, &recvfd, len, msg); 
 			if(rv != RECV_OK)
 			{
 				rv = RECV_ERROR;
@@ -794,9 +832,7 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 			len = htonl(len);
 			memcpy(temp, &len, 4);
 			memcpy(temp + 4, &msg_id, 1);
-			memcpy(temp + 5, msg, ntohl(len));
-			free(msg);
-			msg = NULL;			
+			memcpy(temp + 5, msg, ntohl(len));			
 			process_msgs(temp, len, 0, peer);
 			free(temp);
 			temp = NULL;
@@ -810,7 +846,7 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 	remaining = len - 9; // remaining is no of bytes in this block yet to be downloaded
 	block->length = remaining;
 
-	rv = receive_msg_for_len(socketfd, &recvfd, 4, &msg);
+	rv = receive_msg_for_len(socketfd, &recvfd, 4, msg);
         if(rv != RECV_OK)
         {
 		fprintf(stderr, "[ERROR] receive_and_process_piece_msgs(): Failed to receive piece index.\n");
@@ -818,8 +854,7 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 		goto cleanup;
         }	
 	piece_idx = ntohl(*((int *)msg));
-	free(msg);
-	msg = NULL;	
+
 	if(piece_idx != expected_piece_idx)
 	{
 		fprintf(stderr, "[ERROR] receive_and_process_piece_msgs(): Piece index not as expected. Expected %d, received %d.\n", expected_piece_idx, piece_idx);
@@ -827,7 +862,7 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 		goto cleanup;
 	}
 
-	rv = receive_msg_for_len(socketfd, &recvfd, 4, &msg);
+	rv = receive_msg_for_len(socketfd, &recvfd, 4, msg);
         if(rv != RECV_OK)
         {
                 fprintf(stderr, "[ERROR] receive_and_process_piece_msgs(): Failed to receive block offset.\n");
@@ -839,7 +874,7 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 	printf("[LOG] *-*-*- Going to receive piece_idx: %d, block_offset: %d, block length: %d.\n", piece_idx, block_offset, remaining);
 
 	fseek(savedfp, (piece_idx * piece_length) + block_offset, SEEK_SET);
-	len = 2048; //use len as buffer for following loop	
+	len = 512; //use len as buffer for following loop	
 
 	int bytes_saved = 0;
 	while(remaining)
@@ -849,7 +884,7 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 			len = remaining;
 		}
 
-		rv = receive_msg_for_len(socketfd, &recvfd, 4, &msg);
+		rv = receive_msg_for_len(socketfd, &recvfd, 4, msg);
         	if(rv != RECV_OK)
 	        {
                 	fprintf(stderr, "[ERROR] receive_and_process_piece_msgs(): Failed to receive block data. bytes_saved= %d.\n", bytes_saved);
@@ -860,13 +895,12 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 
 		remaining -= len;
 		bytes_saved += len;
-		free(msg);
-		msg = NULL;
 	}
 	// if here then the block must have been successfully downloaded. update the block struct.
 	block->status = BLOCK_STATUS_DOWNLOADED;
 
 cleanup:
+	printf("************************** EXITING DOWNLOAD BLOCK **************************\n");
 	if(msg)
 	{
 		free(msg);
@@ -881,6 +915,8 @@ cleanup:
 
 uint8_t *prepare_requests(int piece_idx, struct pwp_block *blocks, int num_of_blocks, int max_requests, int *len)
 {
+	printf(">>>>>>>>>>>>>>>>>>> START:  PREPARE_REQUESTS **************************\n");
+	
 	int i, count;
 	int msg_len = 17; // 17 = length of request message
 	uint8_t *requests = malloc(msg_len * max_requests); 
@@ -909,10 +945,12 @@ uint8_t *prepare_requests(int piece_idx, struct pwp_block *blocks, int num_of_bl
 		return NULL;
 	}
 	
+	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  PREPARE_REQUESTS **************************\n");
 	return requests;
 }
 uint8_t *compose_request(int piece_idx, int block_offset, int block_length, int *len)
 {
+	printf(">>>>>>>>>>>>>>>>>>> START:  COMPOSE_REQUESTS **************************\n");
 	*len = 17; // 4 (msg len) + 1 (msg id) + 4 (piece idx) + 4 (block offset) + 4 (block length)
 	uint8_t *msg = malloc(*len); 
 	int temp = htonl(12);
@@ -926,18 +964,20 @@ uint8_t *compose_request(int piece_idx, int block_offset, int block_length, int 
 	temp = htonl(block_length);
 	memcpy(msg+13, &temp, 4);
 	
+	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  COMPOSE_REQUESTS **************************\n");
 	return msg;
 }
 
 int process_bitfield(uint8_t *msg, struct pwp_peer *peer)
 {
+	printf(">>>>>>>>>>>>>>>>>>> START:  PROCESS_BITFIELD **************************\n");
     uint8_t *curr = msg;
     int i, j, rv, idx;
     uint8_t bits, mask;
       
     rv = 0;
     // read bitfield, parse it and populate pieces array accordingly.
-    int len = ntohl((int)(*curr));
+    int len = ntohl(*((int *)curr));
     curr += 5; // get to start of bitfield.
       
     for(i=0; i<len; i++)
@@ -967,11 +1007,13 @@ int process_bitfield(uint8_t *msg, struct pwp_peer *peer)
     }
 
 cleanup:
+	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  PROCESS_BITFIELD **************************\n");
     return rv;
 }
   
 int process_have(uint8_t *msg, struct pwp_peer *peer)
 {
+	printf(">>>>>>>>>>>>>>>>>>> START:  PROCESS_HAVE **************************\n");
     int rv = 0;
     uint8_t *curr = msg;
     int idx = ntohl((int)(*(curr+5)));
@@ -982,11 +1024,13 @@ int process_have(uint8_t *msg, struct pwp_peer *peer)
         pieces[idx].peer = peer;
     }
 
+	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  PROCESS_HAVE **************************\n");
     return rv;
 } 
 
 int choose_random_piece_idx()
 {
+	printf(">>>>>>>>>>>>>>>>>>> START:  CHOOSE_RANDOM_PIECE_IDX **************************\n");
     int i, r, random_piece_idx;
       
     random_piece_idx = -1;
@@ -1015,5 +1059,6 @@ int choose_random_piece_idx()
         }
     }
       
+	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  CHOOSE_RANDOM_PIECE_IDX **************************\n");
     return random_piece_idx;
 }
