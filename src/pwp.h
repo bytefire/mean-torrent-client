@@ -40,6 +40,8 @@
 #define BLOCK_STATUS_NOT_DOWNLOADED 0
 #define BLOCK_STATUS_DOWNLOADED 1 
 
+#define SAVED_FILE_PATH "../../files/loff.savedfile"
+
 struct pwp_peer
 {
         uint8_t peer_id[20]; // TODO: should this be uint8_t peer_id[20]?
@@ -63,6 +65,7 @@ struct pwp_block
 struct pwp_piece *pieces = NULL;
 long int piece_len = -1;
 long int num_of_pieces = -1;
+FILE *savedfp = NULL;
 
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len);
 uint8_t *compose_interested(int *len);
@@ -82,7 +85,7 @@ int process_bitfield(uint8_t *msg, struct pwp_peer *peer);
 int choose_random_piece_idx();
 int download_piece(int idx, int socketfd, struct pwp_peer *peer);
 uint8_t *prepare_requests(int piece_idx, struct pwp_block *blocks, int num_of_blocks, int max_requests, int *len);
-int receive_and_process_piece_msgs(int socketfd, struct pwp_peer *peer)
+int download_block(int socketfd, int expected_piece_idx, struct *pwp_block block, struct pwp_peer *peer);
 
 int pwp_start(char *md_file)
 {
@@ -145,7 +148,15 @@ int pwp_start(char *md_file)
                 goto cleanup;
         }
         bencode_int_value(&b2, &piece_len);
-        
+	// TODO: create a file whose size is num_of_pieces * piece_length        
+	savedfp = util_create_file_of_size(SAVED_FILE_PATH, num_of_pieces * piece_length);
+	if(!savedfp)
+	{
+		fprintf(stderr, "[ERROR] pwp_start(): Failed to create saved file. Aborting.\n");
+		rv = -1;
+		goto cleanup;
+	}
+
 	bencode_dict_get_next(&b1, &b2, &str, &len);
         if(strncmp(str, "peers", 5) != 0)
         {
@@ -204,6 +215,11 @@ cleanup:
 	{
 		printf("[LOG] Freeing IP.\n");
 		free(ip);
+	}
+	if(savedfp)
+	{
+		printf("[LOG] pwp_start(): Closing savedfp.\n");
+		fclose(savedfp);
 	}
 	return rv;	
 }
@@ -655,8 +671,9 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
     11. return 0 or -1 accordingly.
     */
 
-	int i, len;
+	int i, len, rv;
 	uint8_t *requests;
+	struct pwp_block received_block;
 // No 1 above:
 	int num_of_blocks = piece_len / BLOCK_LEN;
 	int bytes_in_last_block = piece_len % BLOCK_LEN;
@@ -691,22 +708,39 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 		        goto cleanup;
         	}
 		printf("[LOG] Sent piece requests. Receiving response now.\n");
-		receive_and_process_piece_msgs(socketfd, peer);
+		while((rv = download_block(socketfd, idx, &received_block, peer)) == RECV_OK)
+		{
+			// calculate block index
+			i = received_block.offset/BLOCK_LEN;
+			if(i >=	num_of_blocks)
+			{
+				fprintf(stderr, "[ERROR] download_piece(): block idx (%d) returned >= num_of_blocks (%d).\n", i, num_of_blocks);
+				goto cleanup;
+			}	
+			blocks[i].status = received_block.status;
+		}
 		
 		free(requests);
+		requests = NULL;
 		requests = prepare_requests(idx, blocks, num_of_blocks, 3, &len);
 	}
-	
+
+cleanup:
+	if(requests)
+	{
+		free(requests);
+	}
 	return 0;
 } 
 
-int receive_and_process_piece_msgs(int socketfd, struct pwp_peer *peer)
+int download_block(int socketfd, int expected_piece_idx, struct *pwp_block block, struct pwp_peer *peer)
 {
 	uint8_t *msg, *temp;
 	int rv, len;
 	uint8_t msg_id;
 	fd_set recvfd;
 	
+	temp = NULL;
 	msg = NULL;
 	msg_id = 255;
 	FD_ZERO(&recvfd);
@@ -730,6 +764,7 @@ int receive_and_process_piece_msgs(int socketfd, struct pwp_peer *peer)
 		rv = receive_msg_for_len(socketfd, &recvfd, 1, &msg); 
 		if(rv != RECV_OK)
 		{
+			rv = RECV_ERROR;
 			goto cleanup;
 		}
 		msg_id = *msg;
@@ -739,25 +774,90 @@ int receive_and_process_piece_msgs(int socketfd, struct pwp_peer *peer)
 			rv = receive_msg_for_len(socketfd, &recvfd, len, &msg); 
 			if(rv != RECV_OK)
 			{
+				rv = RECV_ERROR;
 				goto cleanup;
 			}
 			len = htonl(len);
 			memcpy(temp, &len, 4);
 			memcpy(temp + 4, &msg_id, 1);
 			memcpy(temp + 5, msg, ntohl(len));
-			free(msg);			
+			free(msg);
+			msg = NULL;			
 			process_msgs(temp, len, 0, peer);
 			free(temp);
+			temp = NULL;
 		}
 	}
-	// TODO: process the piece message: len = num of bytes in piece + 1 (for msg id) & msg_id = PIECE_MSG_ID
+	// TODO: process the piece message. here len = num of data bytes in block + 4(piece idx) + 4(block offset) + 1 (for msg id) & msg_id = PIECE_MSG_ID.
 	//	have a global file descriptor to the file that already has the total memory required
 	//	using piece length and idx and block offset calculate position of bytes to store inside that file
 	//	save the bytes in file and mark that block's status as BLOCK_DOWNLOADED
+	int piece_idx, block_offset, remaining;
+	remaining = len - 9; // remaining is no of bytes in this block yet to be downloaded
+	block->length = remaining;
+
+	rv = receive_msg_for_len(socketfd, &recvfd, 4, &msg);
+        if(rv != RECV_OK)
+        {
+		fprintf(stderr, "[ERROR] receive_and_process_piece_msgs(): Failed to receive piece index.\n");
+		rv = RECV_ERROR;
+		goto cleanup;
+        }	
+	piece_idx = ntohl(*((int *)msg));
+	free(msg);
+	msg = NULL;	
+	if(piece_idx != expected_piece_idx)
+	{
+		fprintf(stderr, "[ERROR] receive_and_process_piece_msgs(): Piece index not as expected. Expected %d, received %d.\n", expected_piece_idx, piece_idx);
+                rv = RECV_ERROR;
+		goto cleanup;
+	}
+
+	rv = receive_msg_for_len(socketfd, &recvfd, 4, &msg);
+        if(rv != RECV_OK)
+        {
+                fprintf(stderr, "[ERROR] receive_and_process_piece_msgs(): Failed to receive block offset.\n");
+                rv = RECV_ERROR;
+		goto cleanup;
+        }       
+        block_offset = ntohl(*((int *)msg));
+	block->offset = block_offset;
+	printf("[LOG] *-*-*- Going to receive piece_idx: %d, block_offset: %d, block length: %d.\n", piece_idx, block_offset, remaining);
+
+	int file_pos = (piece_idx * piece_len) + block_offset;
+	len = 2048; //use len as buffer for following loop	
+
+	while(remaining)
+	{
+		if(remaining < len)
+		{
+			len = remaining;
+		}
+
+		rv = receive_msg_for_len(socketfd, &recvfd, 4, &msg);
+        	if(rv != RECV_OK)
+	        {
+                	fprintf(stderr, "[ERROR] receive_and_process_piece_msgs(): Failed to receive block data. file_pos= %d.\n", file_pos);
+			rv = RECV_ERROR;
+        	        goto cleanup;
+	        }
+		util_write_at_pos(savedfp, file_pos, msg, len);
+		remaining -= len;
+		free(msg);
+		msg = NULL;
+	}
+	// if here then the block must have been successfully downloaded. update the block struct.
+	block->status = BLOCK_STATUS_DOWNLOADED;
+
 cleanup:
 	if(msg)
 	{
 		free(msg);
+	}
+
+	if(temp)
+	{
+		free(temp);
 	}
 	return rv;
 }
