@@ -715,6 +715,7 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 			if(i >=	num_of_blocks)
 			{
 				fprintf(stderr, "[ERROR] download_piece(): block idx (%d) returned >= num_of_blocks (%d).\n", i, num_of_blocks);
+				rv = -1;
 				goto cleanup;
 			}	
 			blocks[i].status = received_block.status;
@@ -724,6 +725,10 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 		requests = NULL;
 		requests = prepare_requests(idx, blocks, num_of_blocks, 3, &len);
 	}
+
+	printf("[LOG] *-*-*-*- Downloaded piece!!\n");
+// TODO: verify the piece sha1
+	
 
 cleanup:
 	if(requests)
