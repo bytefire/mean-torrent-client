@@ -803,25 +803,28 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 		
 		if(rv != RECV_OK)
 		{
+			fprintf(stderr, "[ERROR] download_block: failed to receive length. rv = %d (0=OK, 1=timeout, -1=error).\n", rv);
 			goto cleanup;
 		}
 		if(*((int *)msg) == 0)
 		{
+			printf("[LOG] download_block: received KEEP_ALIVE message.\n");
 			msg_id = KEEP_ALIVE_MSG_ID;
 			continue;
 		}
 		len = ntohl(*((int *)msg));
 		
-		
 		rv = receive_msg_for_len(socketfd, &recvfd, 1, msg); 
 		if(rv != RECV_OK)
 		{
+			fprintf(stderr, "[ERROR] download_block: failed to receive message type. rv = %d (0=OK, 1=timeout, -1=error).\n", rv);
 			rv = RECV_ERROR;
 			goto cleanup;
 		}
 		msg_id = *msg;
 		if(msg_id != PIECE_MSG_ID)
 		{
+			printf("[LOG] download_block: the message is not PIECE message.\n");
 			temp = malloc(len + 4);
 			rv = receive_msg_for_len(socketfd, &recvfd, len, msg); 
 			if(rv != RECV_OK)
@@ -838,6 +841,7 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 			temp = NULL;
 		}
 	}
+	printf("[LOG] Received PIECE message!! Going to process it now.\n");
 	// TODO: process the piece message. here len = num of data bytes in block + 4(piece idx) + 4(block offset) + 1 (for msg id) & msg_id = PIECE_MSG_ID.
 	//	have a global file descriptor to the file that already has the total memory required
 	//	using piece length and idx and block offset calculate position of bytes to store inside that file
