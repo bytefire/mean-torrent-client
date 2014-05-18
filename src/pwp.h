@@ -744,7 +744,7 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 	}
 
 // No 4 to 8 above:
-	requests = prepare_requests(idx, blocks, num_of_blocks, 3, &len);
+	requests = prepare_requests(idx, blocks, num_of_blocks, 1, &len);
 	while(requests)
 	{
 		if(send(socketfd, requests, len, 0) == -1)
@@ -756,6 +756,7 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 		bf_log("[LOG] Sent piece requests. Receiving response now.\n");
 		while((rv = download_block(socketfd, idx, &received_block, peer)) == RECV_OK)
 		{
+			bf_log("[LOG] Successfully downloaded one block :)\n");
 			// calculate block index
 			i = received_block.offset/BLOCK_LEN;
 			if(i >=	num_of_blocks)
@@ -769,7 +770,7 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 		
 		free(requests);
 		requests = NULL;
-		requests = prepare_requests(idx, blocks, num_of_blocks, 3, &len);
+		requests = prepare_requests(idx, blocks, num_of_blocks, 1, &len);
 	}
 
 	bf_log("[LOG] *-*-*-*- Downloaded piece!!\n");
@@ -962,7 +963,7 @@ uint8_t *compose_request(int piece_idx, int block_offset, int block_length, int 
 	bf_log("++++++++++++++++++++ START:  COMPOSE_REQUESTS +++++++++++++++++++++++\n");
 	*len = 17; // 4 (msg len) + 1 (msg id) + 4 (piece idx) + 4 (block offset) + 4 (block length)
 	uint8_t *msg = malloc(*len); 
-	int temp = htonl(12);
+	int temp = htonl(13);
 	uint8_t msg_id = REQUEST_MSG_ID;
 	memcpy(msg, &temp, 4);
 	memcpy(msg+4, &msg_id, 1);
