@@ -90,7 +90,7 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 
 int pwp_start(char *md_file)
 {
-printf(">>>>>>>>>>>>>>>>>>> START:  PWP_START **************************\n");
+printf("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 
 	uint8_t *metadata;
 	const char *str;
@@ -208,7 +208,7 @@ printf(">>>>>>>>>>>>>>>>>>> START:  PWP_START **************************\n");
 /********** end of what will be while loop for every peer ****************/
 
 cleanup:
-	printf("*********************** EXIING PWP_START **************************\n");
+	printf(" ------------------------------------ FINISH: PWP_START  ----------------------------------------\n");
 	if(metadata)
 	{
 		printf("[LOG] Freeing metadata.\n");
@@ -229,7 +229,7 @@ cleanup:
 
 int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port)
 {
-	printf(">>>>>>>>>>>>>>>>>>> START:  TALK_TO_PEER **************************\n");
+	printf("++++++++++++++++++++ START:  TALK_TO_PEER +++++++++++++++++++++++\n");
 
 	int rv;
 	int hs_len;
@@ -421,13 +421,13 @@ int receive_msg_hs(int socketfd, fd_set *recvfd, uint8_t **msg, int *len)
         }
 
 cleanup:
-	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  TALK_TO_PEER **************************\n");
+	printf("---------------------------------------- FINISH:  TALK_TO_PEER ----------------------------------------\n");
         return rv;
 }
 
 int receive_msg(int socketfd, fd_set *recvfd, uint8_t **msg, int *len)
 {
-	printf(">>>>>>>>>>>>>>>>>>> START:  RECEIVE_MSG**************************\n");
+	printf("++++++++++++++++++++ START:  RECEIVE_MSG+++++++++++++++++++++++\n");
 	int rv, temp;
 	uint8_t *curr;
 
@@ -453,13 +453,13 @@ int receive_msg(int socketfd, fd_set *recvfd, uint8_t **msg, int *len)
 	*len += 4;
 
 cleanup:
-	printf("*********************** EXIING RECEIVE_MSG **************************\n");
+	printf(" -------------------------------------- FINISH: RECEIVE_MSG  ----------------------------------------\n");
 	return rv;
 }
 
 int get_len(int socketfd, fd_set *recvfd, int *len)
 {
-	printf(">>>>>>>>>>>>>>>>>>> START:  GET_LEN **************************\n");
+	printf("++++++++++++++++++++ START:  GET_LEN +++++++++++++++++++++++\n");
 	
 	int rv;
 	uint8_t *curr = (uint8_t *)len;
@@ -467,13 +467,13 @@ int get_len(int socketfd, fd_set *recvfd, int *len)
 	rv = receive_msg_for_len(socketfd, recvfd, 4, curr);	
 	*len = ntohl(*len);	
 
-	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  GET_LEN **************************\n");
+	printf("---------------------------------------- FINISH:  GET_LEN ----------------------------------------\n");
 	return rv;
 }
 
 int get_len_hs(int socketfd, fd_set *recvfd, int *len)
 {
-	printf(">>>>>>>>>>>>>>>>>>> START:  GET_LEN_HS **************************\n");
+	printf("++++++++++++++++++++ START:  GET_LEN_HS +++++++++++++++++++++++\n");
         int rv;
 	uint8_t *p_name_len = malloc(1);
 
@@ -481,13 +481,13 @@ int get_len_hs(int socketfd, fd_set *recvfd, int *len)
 
         *len = *p_name_len + 8 + 20 + 20;
 
-	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  GET_LEN_HS **************************\n");
+	printf("---------------------------------------- FINISH:  GET_LEN_HS ----------------------------------------\n");
         return rv;
 }
 
 int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t *msg)
 {
-	printf(">>>>>>>>>>>>>>>>>>> START:  RECEIVE_MSG_FOR_LEN **************************\n");
+	printf("++++++++++++++++++++ START:  RECEIVE_MSG_FOR_LEN +++++++++++++++++++++++\n");
 	
 	if(len == 0)
 	{
@@ -521,13 +521,13 @@ int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t *msg)
                 }
         }
 
-	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  RECEIVE_MSG_FOR_LEN **************************\n");
+	printf("---------------------------------------- FINISH:  RECEIVE_MSG_FOR_LEN ----------------------------------------\n");
         return RECV_OK;
 }
 		
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len)
 {
-	printf(">>>>>>>>>>>>>>>>>>> START:  COMPOSE_HANDSHAKE **************************\n");
+	printf("++++++++++++++++++++ START:  COMPOSE_HANDSHAKE +++++++++++++++++++++++\n");
 	
 	uint8_t *hs, *curr;
 	uint8_t temp;
@@ -551,13 +551,13 @@ uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len)
 	curr += 20;
 	memcpy(curr, our_peer_id, 20);
 
-	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  COMPOSE_HANDSHAKE **************************\n");
+	printf("---------------------------------------- FINISH:  COMPOSE_HANDSHAKE ----------------------------------------\n");
 	return hs;
 }
 
 uint8_t *compose_interested(int *len)
 {
-	printf(">>>>>>>>>>>>>>>>>>> START:  COMPOSE_INTERESTED **************************\n");
+	printf("++++++++++++++++++++ START:  COMPOSE_INTERESTED +++++++++++++++++++++++\n");
 	int l;
 	uint8_t *msg, *curr;
 	uint8_t msg_id = 2; // message if for interested is 2
@@ -571,26 +571,26 @@ uint8_t *compose_interested(int *len)
 	curr += 4;
 	memcpy(curr, &msg_id, 1);
 
-	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  COMPOSE_INTERESTED **************************\n");
+	printf("---------------------------------------- FINISH:  COMPOSE_INTERESTED ----------------------------------------\n");
 	return msg;
 }
 
 uint8_t extract_msg_id(uint8_t *response)
 {
-	printf(">>>>>>>>>>>>>>>>>>> START:  EXTRACT_MSG_ID **************************\n");
+	printf("++++++++++++++++++++ START:  EXTRACT_MSG_ID +++++++++++++++++++++++\n");
 	if((*(int *)response) == 0) //if length is zero then keep alive msg
 	{
 		return KEEP_ALIVE_MSG_ID;
 	}
 	uint8_t msg_id = response[4];
 
-	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  EXTRACT_MSG_ID **************************\n");
+	printf("---------------------------------------- FINISH:  EXTRACT_MSG_ID ----------------------------------------\n");
 	return msg_id;
 }
 
 int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 {
-	printf(">>>>>>>>>>>>>>>>>>> START:  PROCESS_MSGS **************************\n");
+	printf("++++++++++++++++++++ START:  PROCESS_MSGS +++++++++++++++++++++++\n");
 	if(!msgs)
 	{
 		fprintf(stderr, "ERROR: process_msgs: MSGS is null.\n");
@@ -679,23 +679,23 @@ int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 	}
 
 cleanup:
-	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  PROCESS_MSGS **************************\n");
+	printf("---------------------------------------- FINISH:  PROCESS_MSGS----------------------------------------\n");
 	return rv;
 }
 
 int get_pieces(int socketfd, struct pwp_peer *peer)
 {
-	printf(">>>>>>>>>>>>>>>>>>> START:  GET_PIECES **************************\n");
+	printf("++++++++++++++++++++ START:  GET_PIECES +++++++++++++++++++++++\n");
 	int idx = choose_random_piece_idx();
 	int rv = download_piece(idx, socketfd, peer);
 
-	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  GET_PIECES **************************\n");
+	printf("---------------------------------------- FINISH:  GET_PIECES----------------------------------------\n");
 	return rv;	
 }
 
 int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 {
-	printf(">>>>>>>>>>>>>>>>>>> START:  DOWNLOAD_PIECE **************************\n");
+	printf("++++++++++++++++++++ START:  DOWNLOAD_PIECE +++++++++++++++++++++++\n");
     /* TODO:
     1. Calculate number of blocks in this piece (2^14 (16384) bytes per block )
     2. malloc an array 'blocks' of struct pwp_block for this piece 
@@ -772,7 +772,7 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 	
 
 cleanup:
-	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  DOWNLOAD_PIECE **************************\n");
+	printf("---------------------------------------- FINISH:  DOWNLOAD_PIECE ----------------------------------------\n");
 	if(requests)
 	{
 		free(requests);
@@ -783,7 +783,7 @@ cleanup:
 int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block, struct pwp_peer *peer)
 {
 
-	printf(">>>>>>>>>>>>>>>>>>> START:  DOWNLOAD BLOCK **************************\n");
+	printf("++++++++++++++++++++ START:  DOWNLOAD BLOCK +++++++++++++++++++++++\n");
 	uint8_t *msg, *temp;
 	int rv, len;
 	uint8_t msg_id;
@@ -900,7 +900,7 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 	block->status = BLOCK_STATUS_DOWNLOADED;
 
 cleanup:
-	printf("************************** EXITING DOWNLOAD BLOCK **************************\n");
+	printf(" ---------------------------------------- FINISHED: DOWNLOAD BLOCK  ----------------------------------------\n");
 	if(msg)
 	{
 		free(msg);
@@ -915,7 +915,7 @@ cleanup:
 
 uint8_t *prepare_requests(int piece_idx, struct pwp_block *blocks, int num_of_blocks, int max_requests, int *len)
 {
-	printf(">>>>>>>>>>>>>>>>>>> START:  PREPARE_REQUESTS **************************\n");
+	printf("++++++++++++++++++++ START:  PREPARE_REQUESTS +++++++++++++++++++++++\n");
 	
 	int i, count;
 	int msg_len = 17; // 17 = length of request message
@@ -945,12 +945,12 @@ uint8_t *prepare_requests(int piece_idx, struct pwp_block *blocks, int num_of_bl
 		return NULL;
 	}
 	
-	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  PREPARE_REQUESTS **************************\n");
+	printf("---------------------------------------- FINISH:  PREPARE_REQUESTS  ----------------------------------------\n");
 	return requests;
 }
 uint8_t *compose_request(int piece_idx, int block_offset, int block_length, int *len)
 {
-	printf(">>>>>>>>>>>>>>>>>>> START:  COMPOSE_REQUESTS **************************\n");
+	printf("++++++++++++++++++++ START:  COMPOSE_REQUESTS +++++++++++++++++++++++\n");
 	*len = 17; // 4 (msg len) + 1 (msg id) + 4 (piece idx) + 4 (block offset) + 4 (block length)
 	uint8_t *msg = malloc(*len); 
 	int temp = htonl(12);
@@ -964,13 +964,13 @@ uint8_t *compose_request(int piece_idx, int block_offset, int block_length, int 
 	temp = htonl(block_length);
 	memcpy(msg+13, &temp, 4);
 	
-	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  COMPOSE_REQUESTS **************************\n");
+	printf("---------------------------------------- FINISH:  COMPOSE_REQUESTS ----------------------------------------\n");
 	return msg;
 }
 
 int process_bitfield(uint8_t *msg, struct pwp_peer *peer)
 {
-	printf(">>>>>>>>>>>>>>>>>>> START:  PROCESS_BITFIELD **************************\n");
+	printf("++++++++++++++++++++ START:  PROCESS_BITFIELD +++++++++++++++++++++++\n");
     uint8_t *curr = msg;
     int i, j, rv, idx;
     uint8_t bits, mask;
@@ -1007,13 +1007,13 @@ int process_bitfield(uint8_t *msg, struct pwp_peer *peer)
     }
 
 cleanup:
-	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  PROCESS_BITFIELD **************************\n");
+	printf("---------------------------------------- FINISH:  PROCESS_BITFIELD ----------------------------------------\n");
     return rv;
 }
   
 int process_have(uint8_t *msg, struct pwp_peer *peer)
 {
-	printf(">>>>>>>>>>>>>>>>>>> START:  PROCESS_HAVE **************************\n");
+	printf("++++++++++++++++++++ START:  PROCESS_HAVE +++++++++++++++++++++++\n");
     int rv = 0;
     uint8_t *curr = msg;
     int idx = ntohl((int)(*(curr+5)));
@@ -1024,13 +1024,13 @@ int process_have(uint8_t *msg, struct pwp_peer *peer)
         pieces[idx].peer = peer;
     }
 
-	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  PROCESS_HAVE **************************\n");
+	printf("---------------------------------------- FINISH:  PROCESS_HAVE ----------------------------------------\n");
     return rv;
 } 
 
 int choose_random_piece_idx()
 {
-	printf(">>>>>>>>>>>>>>>>>>> START:  CHOOSE_RANDOM_PIECE_IDX **************************\n");
+	printf("++++++++++++++++++++ START:  CHOOSE_RANDOM_PIECE_IDX +++++++++++++++++++++++\n");
     int i, r, random_piece_idx;
       
     random_piece_idx = -1;
@@ -1059,6 +1059,6 @@ int choose_random_piece_idx()
         }
     }
       
-	printf("<<<<<<<<<<<<<<<<<<<< FINISH:  CHOOSE_RANDOM_PIECE_IDX **************************\n");
+	printf("---------------------------------------- FINISH:  CHOOSE_RANDOM_PIECE_IDX  ----------------------------------------\n");
     return random_piece_idx;
 }
