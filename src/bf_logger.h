@@ -9,6 +9,12 @@ void bf_logger_init(char *filename)
 {
 	logfn = filename;
 	logfp = fopen(logfn, "w");
+	if(!logfp)
+	{
+		fprintf(stderr, "[FROM LOGGER]: unable to create log file.\n");
+		logfn = NULL;
+		return;
+	}
 	fprintf(logfp, "Start of log file.\n\n");
 	fclose(logfp);
 }
@@ -31,6 +37,8 @@ int bf_log(const char *format, ...)
 	va_list argptr;
 	va_start(argptr, format);
 	vfprintf(logfp, format, argptr);
+	// output to standard output too
+	printf(format);
 	va_end(argptr);
 	
 	fclose(logfp);

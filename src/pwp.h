@@ -13,6 +13,7 @@
 
 #include "bencode.h"
 #include "util.h"
+#include "bf_logger.h"
 
 #define MAX_DATA_LEN 1024
 
@@ -41,6 +42,7 @@
 #define BLOCK_STATUS_DOWNLOADED 1 
 
 #define SAVED_FILE_PATH "../../files/loff.savedfile"
+#define LOG_FILE "logs/pwp.log"
 
 struct pwp_peer
 {
@@ -90,7 +92,8 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 
 int pwp_start(char *md_file)
 {
-printf("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
+	bf_logger_init(LOG_FILE);
+bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 
 	uint8_t *metadata;
 	const char *str;
@@ -116,7 +119,7 @@ printf("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
         if(strncmp(str, "info_hash", 9) != 0)
         {
                 rv = -1;
-		fprintf(stderr, "Failed to find 'info_hash' in metadata file.\n");
+		bf_log( "Failed to find 'info_hash' in metadata file.\n");
                 goto cleanup;
         }
         bencode_string_value(&b2, &str, &len);
@@ -126,7 +129,7 @@ printf("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
         if(strncmp(str, "our_peer_id", 11) != 0)
         {
                 rv = -1;
-		fprintf(stderr, "Failed to find 'our_peer_id' in metadata file.\n");
+		bf_log(  "Failed to find 'our_peer_id' in metadata file.\n");
                 goto cleanup;
         }
         bencode_string_value(&b2, &str, &len);
@@ -136,7 +139,7 @@ printf("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
         if(strncmp(str, "num_of_pieces", 13) != 0)
         {
                 rv = -1;
-                fprintf(stderr, "Failed to find 'num_of_pieces' in metadata file.\n");
+                bf_log(  "Failed to find 'num_of_pieces' in metadata file.\n");
                 goto cleanup;
         }
         bencode_int_value(&b2, &num_of_pieces);
@@ -147,7 +150,7 @@ printf("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
         if(strncmp(str, "piece_length", 12) != 0)
         {
                 rv = -1;
-                fprintf(stderr, "Failed to find 'piece_length' in metadata file.\n");
+                bf_log(  "Failed to find 'piece_length' in metadata file.\n");
                 goto cleanup;
         }
         bencode_int_value(&b2, &piece_length);
@@ -155,7 +158,7 @@ printf("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 	savedfp = util_create_file_of_size(SAVED_FILE_PATH, num_of_pieces * piece_length);
 	if(!savedfp)
 	{
-		fprintf(stderr, "[ERROR] pwp_start(): Failed to create saved file. Aborting.\n");
+		bf_log(  "[ERROR] pwp_start(): Failed to create saved file. Aborting.\n");
 		rv = -1;
 		goto cleanup;
 	}
@@ -164,7 +167,7 @@ printf("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
         if(strncmp(str, "peers", 5) != 0)
         {
                 rv = -1;
-		fprintf(stderr, "Failed to find 'peers' in metadata file.\n");
+		bf_log(  "Failed to find 'peers' in metadata file.\n");
                 goto cleanup;
         }
 
@@ -178,7 +181,7 @@ printf("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
         	if(strncmp(str, "ip", 2) != 0)
        		{
                 	rv = -1;
-                	fprintf(stderr, "Failed to find 'ip' in metadata file.\n");
+                	bf_log(  "Failed to find 'ip' in metadata file.\n");
                 	goto cleanup;
         	}
         	bencode_string_value(&b4, &str, &len);
@@ -190,16 +193,16 @@ printf("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 	        if(strncmp(str, "port", 4) != 0)
        		{
         	        rv = -1;
-	                fprintf(stderr, "Failed to find 'port' in metadata file.\n");
+	                bf_log(  "Failed to find 'port' in metadata file.\n");
                 	goto cleanup;
         	}
        		bencode_int_value(&b4, &num);
 		port = (uint16_t)num;
 		
-		printf("*** Going to process peer: %s:%d\n", ip, port);
+		bf_log("*** Going to process peer: %s:%d\n", ip, port);
 		rv = talk_to_peer(info_hash, our_peer_id, ip, port);
 		
-		printf("[LOG] pwp_start: rv from talk_to_peer is %d.\n\n", rv);
+		bf_log("[LOG] pwp_start: rv from talk_to_peer is %d.\n\n", rv);
 		if(rv == 0)
 		{
 			break;
@@ -208,28 +211,29 @@ printf("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 /********** end of what will be while loop for every peer ****************/
 
 cleanup:
-	printf(" ------------------------------------ FINISH: PWP_START  ----------------------------------------\n");
+	bf_log(" ------------------------------------ FINISH: PWP_START  ----------------------------------------\n");
 	if(metadata)
 	{
-		printf("[LOG] Freeing metadata.\n");
+		bf_log("[LOG] Freeing metadata.\n");
 		free(metadata);
 	}
 	if(ip)
 	{
-		printf("[LOG] Freeing IP.\n");
+		bf_log("[LOG] Freeing IP.\n");
 		free(ip);
 	}
 	if(savedfp)
 	{
-		printf("[LOG] pwp_start(): Closing savedfp.\n");
+		bf_log("[LOG] pwp_start(): Closing savedfp.\n");
 		fclose(savedfp);
 	}
+	bf_logger_end();
 	return rv;	
 }
 
 int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port)
 {
-	printf("++++++++++++++++++++ START:  TALK_TO_PEER +++++++++++++++++++++++\n");
+	bf_log("++++++++++++++++++++ START:  TALK_TO_PEER +++++++++++++++++++++++\n");
 
 	int rv;
 	int hs_len;
@@ -266,7 +270,7 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	peer.sin_port = peer_port;
 	if(inet_aton(ip, &peer.sin_addr) == 0)
 	{
-		fprintf(stderr, "Failed to read in ip address of the peer.\n");
+		bf_log(  "Failed to read in ip address of the peer.\n");
 		rv = -1;
 		goto cleanup;
 	}
@@ -278,7 +282,7 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
         }
 
 	/*********** SEND HANDSHAKE ****************/
-	printf("[LOG] Sent handshake.\n");
+	bf_log("[LOG] Sent handshake.\n");
 	if(send(socketfd, hs, hs_len, 0) == -1)
 	{
 		perror("send");
@@ -288,16 +292,16 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 
 	/*********** RECEIVE HANDSHAKE + BITFIELD + HAVE's (possibly) ***********/
 	rv = receive_msg_hs(socketfd, &recvfd, &recvd_msg, &len);
-	printf("[LOG] rv from receive_msg: %d.\n", rv);
+	bf_log("[LOG] rv from receive_msg: %d.\n", rv);
         if(rv == RECV_ERROR)
         {
 		goto cleanup;
         }
         if(rv != RECV_TO)
         {
-		printf("[LOG] Received handshake response of length %d. Going to process it now.\n", len);
+		bf_log("[LOG] Received handshake response of length %d. Going to process it now.\n", len);
 		process_msgs(recvd_msg, len, 1, &peer_status);
-		printf("[LOG] Done pocessing handshake.\n");
+		bf_log("[LOG] Done pocessing handshake.\n");
         }
         if(recvd_msg)
         {
@@ -308,14 +312,14 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	do
 	{
 		rv = receive_msg(socketfd, &recvfd, &recvd_msg, &len);
-		printf("[LOG] rv from receive_msg: %d.\n", rv);
+		bf_log("[LOG] rv from receive_msg: %d.\n", rv);
 		if(rv == RECV_ERROR)
 		{
 			goto cleanup;
 		}
 		if(rv != RECV_TO)
 		{
-			printf("[LOG] Received next msg after HS. Len: %d. Goinf to process it now.\n", len);
+			bf_log("[LOG] Received next msg after HS. Len: %d. Goinf to process it now.\n", len);
 			process_msgs(recvd_msg, len, 0, &peer_status);
 		}
 		if(recvd_msg)
@@ -325,11 +329,11 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 		}
 	} while(rv != RECV_TO);
 
-	printf("[LOG] Finished receiving until timeout. Checking if peer has any pieces.\n");
+	bf_log("[LOG] Finished receiving until timeout. Checking if peer has any pieces.\n");
 	// check if this peer has any pieces we don't have and then send interested.
 	if(!peer_status.has_pieces)
 	{
-		printf("** Peer has no pieces, so not sending interested.\n");
+		bf_log("** Peer has no pieces, so not sending interested.\n");
 		rv = -1;
 		goto cleanup;
 	}	
@@ -344,13 +348,13 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
                 goto cleanup;
         }
 
-	printf("[LOG] Sent interested message. Receiving response now.\n");
+	bf_log("[LOG] Sent interested message. Receiving response now.\n");
 	/******** RECEIVE RESPONSE TO INTERESTED *************/
 	while(!peer_status.unchoked)
 	{
 		// TODO: refactor this set of lines into it's own method. it's repeated whenever we want to receive messages.
 		rv = receive_msg(socketfd, &recvfd, &recvd_msg, &len);
-		printf("[LOG] rv from receive_msg: %d.\n", rv);
+		bf_log("[LOG] rv from receive_msg: %d.\n", rv);
         	if(rv == RECV_ERROR)
         	{
                 	goto cleanup;
@@ -360,7 +364,7 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 			goto cleanup;
 		}
 
-		printf("[LOG] Received response for INTERESTED message. Going to process it now.\n");
+		bf_log("[LOG] Received response for INTERESTED message. Going to process it now.\n");
 		process_msgs(recvd_msg, len, 0, &peer_status);
 		if(recvd_msg)
 		{
@@ -369,27 +373,27 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 		}
 	}
 	rv = 0;
-	printf("[LOG] Peer has unchoked us.\n");	
+	bf_log("[LOG] Peer has unchoked us.\n");	
 	// if here then pieces must be populated and we're unchoked too.
 	// TODO: start requesting pieces	
 	rv = get_pieces(socketfd, &peer_status);
 
 cleanup:
-	printf("[LOG] In cleanup.\n");
+	bf_log("[LOG] In cleanup.\n");
 	if(socketfd > 0)
 	{
-		printf("[LOG] Closing socket.\n");
+		bf_log("[LOG] Closing socket.\n");
 		close(socketfd);
 	}
 	if(hs)
 	{
-		printf("[LOG] Freeing HS.\n");
+		bf_log("[LOG] Freeing HS.\n");
 		free(hs);
 		hs = NULL;
 	}
 	if(recvd_msg)
         {
-		printf("[LOG] Freeing recvd_msg.\n");
+		bf_log("[LOG] Freeing recvd_msg.\n");
 		free(recvd_msg);
                 recvd_msg = NULL;
         }
@@ -404,7 +408,7 @@ int receive_msg_hs(int socketfd, fd_set *recvfd, uint8_t **msg, int *len)
         rv = get_len_hs(socketfd, recvfd, len);
         if(rv != RECV_OK)
         {
-                fprintf(stderr, "[LOG] inside receive_msg_hs: get_len_hs didn't return RECV_OK. rv = %d (0=OK; 1=TO; -1=ERROR)\n", rv);
+                bf_log(  "[LOG] inside receive_msg_hs: get_len_hs didn't return RECV_OK. rv = %d (0=OK; 1=TO; -1=ERROR)\n", rv);
                 goto cleanup;
         }
 
@@ -415,26 +419,26 @@ int receive_msg_hs(int socketfd, fd_set *recvfd, uint8_t **msg, int *len)
         rv = receive_msg_for_len(socketfd, recvfd, *len, curr);
         if(rv != RECV_OK)
         {
-                fprintf(stderr, "[ERROR] inside receive_msg_hs: receive_msg_for_len didn't return RECV_OK. rv = %d (0=OK; 1=TO; -1=ERROR)\n", rv);
+                bf_log(  "[ERROR] inside receive_msg_hs: receive_msg_for_len didn't return RECV_OK. rv = %d (0=OK; 1=TO; -1=ERROR)\n", rv);
                 rv = RECV_ERROR; // even if it is timeout, at this stage it means error.
                 goto cleanup;
         }
 
 cleanup:
-	printf("---------------------------------------- FINISH:  TALK_TO_PEER ----------------------------------------\n");
+	bf_log("---------------------------------------- FINISH:  TALK_TO_PEER ----------------------------------------\n");
         return rv;
 }
 
 int receive_msg(int socketfd, fd_set *recvfd, uint8_t **msg, int *len)
 {
-	printf("++++++++++++++++++++ START:  RECEIVE_MSG+++++++++++++++++++++++\n");
+	bf_log("++++++++++++++++++++ START:  RECEIVE_MSG+++++++++++++++++++++++\n");
 	int rv, temp;
 	uint8_t *curr;
 
 	rv = get_len(socketfd, recvfd, len);
 	if(rv != RECV_OK)
 	{
-		fprintf(stderr, "[LOG] inside receive_msg: get_len didn't return RECV_OK. rv = %d (0=OK; 1=TO; -1=ERROR)\n", rv);
+		bf_log(  "[LOG] inside receive_msg: get_len didn't return RECV_OK. rv = %d (0=OK; 1=TO; -1=ERROR)\n", rv);
 		goto cleanup;
 	}
 
@@ -446,20 +450,20 @@ int receive_msg(int socketfd, fd_set *recvfd, uint8_t **msg, int *len)
 	rv = receive_msg_for_len(socketfd, recvfd, *len, curr);
 	if(rv != RECV_OK)
 	{
-		fprintf(stderr, "[ERROR] inside receive_msg: receive_msg_for_len didn't return RECV_OK. rv = %d (0=OK; 1=TO; -1=ERROR)\n", rv);
+		bf_log(  "[ERROR] inside receive_msg: receive_msg_for_len didn't return RECV_OK. rv = %d (0=OK; 1=TO; -1=ERROR)\n", rv);
                 rv = RECV_ERROR; // even if it is timeout, at this stage it means error.
 		goto cleanup;
 	}
 	*len += 4;
 
 cleanup:
-	printf(" -------------------------------------- FINISH: RECEIVE_MSG  ----------------------------------------\n");
+	bf_log(" -------------------------------------- FINISH: RECEIVE_MSG  ----------------------------------------\n");
 	return rv;
 }
 
 int get_len(int socketfd, fd_set *recvfd, int *len)
 {
-	printf("++++++++++++++++++++ START:  GET_LEN +++++++++++++++++++++++\n");
+	bf_log("++++++++++++++++++++ START:  GET_LEN +++++++++++++++++++++++\n");
 	
 	int rv;
 	uint8_t *curr = (uint8_t *)len;
@@ -467,13 +471,13 @@ int get_len(int socketfd, fd_set *recvfd, int *len)
 	rv = receive_msg_for_len(socketfd, recvfd, 4, curr);	
 	*len = ntohl(*len);	
 
-	printf("---------------------------------------- FINISH:  GET_LEN ----------------------------------------\n");
+	bf_log("---------------------------------------- FINISH:  GET_LEN ----------------------------------------\n");
 	return rv;
 }
 
 int get_len_hs(int socketfd, fd_set *recvfd, int *len)
 {
-	printf("++++++++++++++++++++ START:  GET_LEN_HS +++++++++++++++++++++++\n");
+	bf_log("++++++++++++++++++++ START:  GET_LEN_HS +++++++++++++++++++++++\n");
         int rv;
 	uint8_t *p_name_len = malloc(1);
 
@@ -481,13 +485,13 @@ int get_len_hs(int socketfd, fd_set *recvfd, int *len)
 
         *len = *p_name_len + 8 + 20 + 20;
 
-	printf("---------------------------------------- FINISH:  GET_LEN_HS ----------------------------------------\n");
+	bf_log("---------------------------------------- FINISH:  GET_LEN_HS ----------------------------------------\n");
         return rv;
 }
 
 int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t *msg)
 {
-	printf("++++++++++++++++++++ START:  RECEIVE_MSG_FOR_LEN +++++++++++++++++++++++\n");
+	bf_log("++++++++++++++++++++ START:  RECEIVE_MSG_FOR_LEN +++++++++++++++++++++++\n");
 	
 	if(len == 0)
 	{
@@ -501,7 +505,7 @@ int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t *msg)
         tv.tv_usec = 0;
         // TODO: the for-loop to keep receiving until we have received the 4 bytes which specify length.
         rv = select(socketfd + 1, recvfd, NULL, NULL, &tv);
-        printf("[LOG] get_len: value of 'rv' after select: %d (1=OK; 0=timeout; -1=error)\n", rv);
+        bf_log("[LOG] get_len: value of 'rv' after select: %d (1=OK; 0=timeout; -1=error)\n", rv);
 
         if(rv == -1)
         {
@@ -521,13 +525,13 @@ int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t *msg)
                 }
         }
 
-	printf("---------------------------------------- FINISH:  RECEIVE_MSG_FOR_LEN ----------------------------------------\n");
+	bf_log("---------------------------------------- FINISH:  RECEIVE_MSG_FOR_LEN ----------------------------------------\n");
         return RECV_OK;
 }
 		
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len)
 {
-	printf("++++++++++++++++++++ START:  COMPOSE_HANDSHAKE +++++++++++++++++++++++\n");
+	bf_log("++++++++++++++++++++ START:  COMPOSE_HANDSHAKE +++++++++++++++++++++++\n");
 	
 	uint8_t *hs, *curr;
 	uint8_t temp;
@@ -551,13 +555,13 @@ uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len)
 	curr += 20;
 	memcpy(curr, our_peer_id, 20);
 
-	printf("---------------------------------------- FINISH:  COMPOSE_HANDSHAKE ----------------------------------------\n");
+	bf_log("---------------------------------------- FINISH:  COMPOSE_HANDSHAKE ----------------------------------------\n");
 	return hs;
 }
 
 uint8_t *compose_interested(int *len)
 {
-	printf("++++++++++++++++++++ START:  COMPOSE_INTERESTED +++++++++++++++++++++++\n");
+	bf_log("++++++++++++++++++++ START:  COMPOSE_INTERESTED +++++++++++++++++++++++\n");
 	int l;
 	uint8_t *msg, *curr;
 	uint8_t msg_id = 2; // message if for interested is 2
@@ -571,29 +575,29 @@ uint8_t *compose_interested(int *len)
 	curr += 4;
 	memcpy(curr, &msg_id, 1);
 
-	printf("---------------------------------------- FINISH:  COMPOSE_INTERESTED ----------------------------------------\n");
+	bf_log("---------------------------------------- FINISH:  COMPOSE_INTERESTED ----------------------------------------\n");
 	return msg;
 }
 
 uint8_t extract_msg_id(uint8_t *response)
 {
-	printf("++++++++++++++++++++ START:  EXTRACT_MSG_ID +++++++++++++++++++++++\n");
+	bf_log("++++++++++++++++++++ START:  EXTRACT_MSG_ID +++++++++++++++++++++++\n");
 	if((*(int *)response) == 0) //if length is zero then keep alive msg
 	{
 		return KEEP_ALIVE_MSG_ID;
 	}
 	uint8_t msg_id = response[4];
 
-	printf("---------------------------------------- FINISH:  EXTRACT_MSG_ID ----------------------------------------\n");
+	bf_log("---------------------------------------- FINISH:  EXTRACT_MSG_ID ----------------------------------------\n");
 	return msg_id;
 }
 
 int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 {
-	printf("++++++++++++++++++++ START:  PROCESS_MSGS +++++++++++++++++++++++\n");
+	bf_log("++++++++++++++++++++ START:  PROCESS_MSGS +++++++++++++++++++++++\n");
 	if(!msgs)
 	{
-		fprintf(stderr, "ERROR: process_msgs: MSGS is null.\n");
+		bf_log(  "ERROR: process_msgs: MSGS is null.\n");
 		return -1;
 	}
 
@@ -614,7 +618,7 @@ int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 		memcpy(peer->peer_id, temp, 20);
 		curr += jump + 20;
 		len = len - jump - 20;
-		printf("*-*-* Got HANDSHAKE message.\n");
+		bf_log("*-*-* Got HANDSHAKE message.\n");
 	}
 
 	while(len > 0)
@@ -624,48 +628,48 @@ int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 		{
 			case BITFIELD_MSG_ID:
 				// TODO: populate global stats collection
-				printf("*-*-* Got BITFIELD message.\n");
+				bf_log("*-*-* Got BITFIELD message.\n");
 				process_bitfield(temp, peer);
 				peer->has_pieces = 1;
 				break;
 			case UNCHOKE_MSG_ID:
 				peer->unchoked = 1;
-				printf("*-*-* Got UNCHOKE message.\n");
+				bf_log("*-*-* Got UNCHOKE message.\n");
 				break;
 			// TODO: other cases
 			case CHOKE_MSG_ID:
 				peer->unchoked = 0;
-				printf("*-*-* Got CHOKE message.\n");
+				bf_log("*-*-* Got CHOKE message.\n");
 				break;
 			case INTERESTED_MSG_ID:
 				// TODO:
-				printf("*-*-* Got INTERESTED message.\n");
+				bf_log("*-*-* Got INTERESTED message.\n");
 				break;
 			case NOT_INTERESTED_MSG_ID:
 				// TODO:
-				printf("*-*-* Got NOT INTERESTED message.\n");
+				bf_log("*-*-* Got NOT INTERESTED message.\n");
 				break;
 			case HAVE_MSG_ID:
 				// TODO:
-				printf("*-*-* Got HAVE message.\n");
+				bf_log("*-*-* Got HAVE message.\n");
 				process_have(temp, peer);
 				peer->has_pieces = 1;
 				break;
 			case REQUEST_MSG_ID:
 				// TODO:
-				printf("*-*-* Got REQUEST message.\n");
+				bf_log("*-*-* Got REQUEST message.\n");
 				break;
 			case PIECE_MSG_ID:
 				// TODO:
-				printf("*-*-* Got PIECE message.\n");
+				bf_log("*-*-* Got PIECE message.\n");
 				break;
 			case CANCEL_MSG_ID:
 				// TODO:
-				printf("*-*-* Got CANCEL message.\n");
+				bf_log("*-*-* Got CANCEL message.\n");
 				break;
 			case KEEP_ALIVE_MSG_ID:
 			        // TODO:
-				printf("*-*-* Got KEEP ALIVE message.\n");
+				bf_log("*-*-* Got KEEP ALIVE message.\n");
 				break;
 			default:
 				rv = -1;
@@ -679,23 +683,23 @@ int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 	}
 
 cleanup:
-	printf("---------------------------------------- FINISH:  PROCESS_MSGS----------------------------------------\n");
+	bf_log("---------------------------------------- FINISH:  PROCESS_MSGS----------------------------------------\n");
 	return rv;
 }
 
 int get_pieces(int socketfd, struct pwp_peer *peer)
 {
-	printf("++++++++++++++++++++ START:  GET_PIECES +++++++++++++++++++++++\n");
+	bf_log("++++++++++++++++++++ START:  GET_PIECES +++++++++++++++++++++++\n");
 	int idx = choose_random_piece_idx();
 	int rv = download_piece(idx, socketfd, peer);
 
-	printf("---------------------------------------- FINISH:  GET_PIECES----------------------------------------\n");
+	bf_log("---------------------------------------- FINISH:  GET_PIECES----------------------------------------\n");
 	return rv;	
 }
 
 int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 {
-	printf("++++++++++++++++++++ START:  DOWNLOAD_PIECE +++++++++++++++++++++++\n");
+	bf_log("++++++++++++++++++++ START:  DOWNLOAD_PIECE +++++++++++++++++++++++\n");
     /* TODO:
     1. Calculate number of blocks in this piece (2^14 (16384) bytes per block )
     2. malloc an array 'blocks' of struct pwp_block for this piece 
@@ -748,14 +752,14 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 		        rv = -1;
 		        goto cleanup;
         	}
-		printf("[LOG] Sent piece requests. Receiving response now.\n");
+		bf_log("[LOG] Sent piece requests. Receiving response now.\n");
 		while((rv = download_block(socketfd, idx, &received_block, peer)) == RECV_OK)
 		{
 			// calculate block index
 			i = received_block.offset/BLOCK_LEN;
 			if(i >=	num_of_blocks)
 			{
-				fprintf(stderr, "[ERROR] download_piece(): block idx (%d) returned >= num_of_blocks (%d).\n", i, num_of_blocks);
+				bf_log(  "[ERROR] download_piece(): block idx (%d) returned >= num_of_blocks (%d).\n", i, num_of_blocks);
 				rv = -1;
 				goto cleanup;
 			}	
@@ -767,12 +771,12 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 		requests = prepare_requests(idx, blocks, num_of_blocks, 3, &len);
 	}
 
-	printf("[LOG] *-*-*-*- Downloaded piece!!\n");
+	bf_log("[LOG] *-*-*-*- Downloaded piece!!\n");
 // TODO: verify the piece sha1
 	
 
 cleanup:
-	printf("---------------------------------------- FINISH:  DOWNLOAD_PIECE ----------------------------------------\n");
+	bf_log("---------------------------------------- FINISH:  DOWNLOAD_PIECE ----------------------------------------\n");
 	if(requests)
 	{
 		free(requests);
@@ -783,7 +787,7 @@ cleanup:
 int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block, struct pwp_peer *peer)
 {
 
-	printf("++++++++++++++++++++ START:  DOWNLOAD BLOCK +++++++++++++++++++++++\n");
+	bf_log("++++++++++++++++++++ START:  DOWNLOAD BLOCK +++++++++++++++++++++++\n");
 	uint8_t *msg, *temp;
 	int rv, len;
 	uint8_t msg_id;
@@ -798,17 +802,17 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 	// NOTE: cannot call receive_msg method above because piece msg will be too long to hold in memory.
 	while(msg_id != PIECE_MSG_ID)
 	{
-		printf("[LOG] Going to get length of message. calling receive_msg_for_len().\n");
+		bf_log("[LOG] Going to get length of message. calling receive_msg_for_len().\n");
 		rv = receive_msg_for_len(socketfd, &recvfd, 4, msg); 
 		
 		if(rv != RECV_OK)
 		{
-			fprintf(stderr, "[ERROR] download_block: failed to receive length. rv = %d (0=OK, 1=timeout, -1=error).\n", rv);
+			bf_log(  "[ERROR] download_block: failed to receive length. rv = %d (0=OK, 1=timeout, -1=error).\n", rv);
 			goto cleanup;
 		}
 		if(*((int *)msg) == 0)
 		{
-			printf("[LOG] download_block: received KEEP_ALIVE message.\n");
+			bf_log("[LOG] download_block: received KEEP_ALIVE message.\n");
 			msg_id = KEEP_ALIVE_MSG_ID;
 			continue;
 		}
@@ -817,14 +821,14 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 		rv = receive_msg_for_len(socketfd, &recvfd, 1, msg); 
 		if(rv != RECV_OK)
 		{
-			fprintf(stderr, "[ERROR] download_block: failed to receive message type. rv = %d (0=OK, 1=timeout, -1=error).\n", rv);
+			bf_log(  "[ERROR] download_block: failed to receive message type. rv = %d (0=OK, 1=timeout, -1=error).\n", rv);
 			rv = RECV_ERROR;
 			goto cleanup;
 		}
 		msg_id = *msg;
 		if(msg_id != PIECE_MSG_ID)
 		{
-			printf("[LOG] download_block: the message is not PIECE message.\n");
+			bf_log("[LOG] download_block: the message is not PIECE message.\n");
 			temp = malloc(len + 4);
 			rv = receive_msg_for_len(socketfd, &recvfd, len, msg); 
 			if(rv != RECV_OK)
@@ -841,7 +845,7 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 			temp = NULL;
 		}
 	}
-	printf("[LOG] Received PIECE message!! Going to process it now.\n");
+	bf_log("[LOG] Received PIECE message!! Going to process it now.\n");
 	// TODO: process the piece message. here len = num of data bytes in block + 4(piece idx) + 4(block offset) + 1 (for msg id) & msg_id = PIECE_MSG_ID.
 	//	have a global file descriptor to the file that already has the total memory required
 	//	using piece length and idx and block offset calculate position of bytes to store inside that file
@@ -853,7 +857,7 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 	rv = receive_msg_for_len(socketfd, &recvfd, 4, msg);
         if(rv != RECV_OK)
         {
-		fprintf(stderr, "[ERROR] receive_and_process_piece_msgs(): Failed to receive piece index.\n");
+		bf_log(  "[ERROR] receive_and_process_piece_msgs(): Failed to receive piece index.\n");
 		rv = RECV_ERROR;
 		goto cleanup;
         }	
@@ -861,7 +865,7 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 
 	if(piece_idx != expected_piece_idx)
 	{
-		fprintf(stderr, "[ERROR] receive_and_process_piece_msgs(): Piece index not as expected. Expected %d, received %d.\n", expected_piece_idx, piece_idx);
+		bf_log(  "[ERROR] receive_and_process_piece_msgs(): Piece index not as expected. Expected %d, received %d.\n", expected_piece_idx, piece_idx);
                 rv = RECV_ERROR;
 		goto cleanup;
 	}
@@ -869,13 +873,13 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 	rv = receive_msg_for_len(socketfd, &recvfd, 4, msg);
         if(rv != RECV_OK)
         {
-                fprintf(stderr, "[ERROR] receive_and_process_piece_msgs(): Failed to receive block offset.\n");
+                bf_log(  "[ERROR] receive_and_process_piece_msgs(): Failed to receive block offset.\n");
                 rv = RECV_ERROR;
 		goto cleanup;
         }       
         block_offset = ntohl(*((int *)msg));
 	block->offset = block_offset;
-	printf("[LOG] *-*-*- Going to receive piece_idx: %d, block_offset: %d, block length: %d.\n", piece_idx, block_offset, remaining);
+	bf_log("[LOG] *-*-*- Going to receive piece_idx: %d, block_offset: %d, block length: %d.\n", piece_idx, block_offset, remaining);
 
 	fseek(savedfp, (piece_idx * piece_length) + block_offset, SEEK_SET);
 	len = 512; //use len as buffer for following loop	
@@ -891,7 +895,7 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 		rv = receive_msg_for_len(socketfd, &recvfd, 4, msg);
         	if(rv != RECV_OK)
 	        {
-                	fprintf(stderr, "[ERROR] receive_and_process_piece_msgs(): Failed to receive block data. bytes_saved= %d.\n", bytes_saved);
+                	bf_log(  "[ERROR] receive_and_process_piece_msgs(): Failed to receive block data. bytes_saved= %d.\n", bytes_saved);
 			rv = RECV_ERROR;
         	        goto cleanup;
 	        }
@@ -904,7 +908,7 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 	block->status = BLOCK_STATUS_DOWNLOADED;
 
 cleanup:
-	printf(" ---------------------------------------- FINISHED: DOWNLOAD BLOCK  ----------------------------------------\n");
+	bf_log(" ---------------------------------------- FINISHED: DOWNLOAD BLOCK  ----------------------------------------\n");
 	if(msg)
 	{
 		free(msg);
@@ -919,7 +923,7 @@ cleanup:
 
 uint8_t *prepare_requests(int piece_idx, struct pwp_block *blocks, int num_of_blocks, int max_requests, int *len)
 {
-	printf("++++++++++++++++++++ START:  PREPARE_REQUESTS +++++++++++++++++++++++\n");
+	bf_log("++++++++++++++++++++ START:  PREPARE_REQUESTS +++++++++++++++++++++++\n");
 	
 	int i, count;
 	int msg_len = 17; // 17 = length of request message
@@ -949,12 +953,12 @@ uint8_t *prepare_requests(int piece_idx, struct pwp_block *blocks, int num_of_bl
 		return NULL;
 	}
 	
-	printf("---------------------------------------- FINISH:  PREPARE_REQUESTS  ----------------------------------------\n");
+	bf_log("---------------------------------------- FINISH:  PREPARE_REQUESTS  ----------------------------------------\n");
 	return requests;
 }
 uint8_t *compose_request(int piece_idx, int block_offset, int block_length, int *len)
 {
-	printf("++++++++++++++++++++ START:  COMPOSE_REQUESTS +++++++++++++++++++++++\n");
+	bf_log("++++++++++++++++++++ START:  COMPOSE_REQUESTS +++++++++++++++++++++++\n");
 	*len = 17; // 4 (msg len) + 1 (msg id) + 4 (piece idx) + 4 (block offset) + 4 (block length)
 	uint8_t *msg = malloc(*len); 
 	int temp = htonl(12);
@@ -968,13 +972,13 @@ uint8_t *compose_request(int piece_idx, int block_offset, int block_length, int 
 	temp = htonl(block_length);
 	memcpy(msg+13, &temp, 4);
 	
-	printf("---------------------------------------- FINISH:  COMPOSE_REQUESTS ----------------------------------------\n");
+	bf_log("---------------------------------------- FINISH:  COMPOSE_REQUESTS ----------------------------------------\n");
 	return msg;
 }
 
 int process_bitfield(uint8_t *msg, struct pwp_peer *peer)
 {
-	printf("++++++++++++++++++++ START:  PROCESS_BITFIELD +++++++++++++++++++++++\n");
+	bf_log("++++++++++++++++++++ START:  PROCESS_BITFIELD +++++++++++++++++++++++\n");
     uint8_t *curr = msg;
     int i, j, rv, idx;
     uint8_t bits, mask;
@@ -995,7 +999,7 @@ int process_bitfield(uint8_t *msg, struct pwp_peer *peer)
                 idx = i*8 + j;
                 if(idx >= num_of_pieces)
                 {
-                    fprintf(stderr, "[ERROR] Bitfield has more bits set than there are number of pieces.\n");
+                    bf_log(  "[ERROR] Bitfield has more bits set than there are number of pieces.\n");
                     rv = -1;
                     // TODO: Reset all pieces that were set to available for this particular peer.
                     goto cleanup;
@@ -1011,13 +1015,13 @@ int process_bitfield(uint8_t *msg, struct pwp_peer *peer)
     }
 
 cleanup:
-	printf("---------------------------------------- FINISH:  PROCESS_BITFIELD ----------------------------------------\n");
+	bf_log("---------------------------------------- FINISH:  PROCESS_BITFIELD ----------------------------------------\n");
     return rv;
 }
   
 int process_have(uint8_t *msg, struct pwp_peer *peer)
 {
-	printf("++++++++++++++++++++ START:  PROCESS_HAVE +++++++++++++++++++++++\n");
+	bf_log("++++++++++++++++++++ START:  PROCESS_HAVE +++++++++++++++++++++++\n");
     int rv = 0;
     uint8_t *curr = msg;
     int idx = ntohl((int)(*(curr+5)));
@@ -1028,13 +1032,13 @@ int process_have(uint8_t *msg, struct pwp_peer *peer)
         pieces[idx].peer = peer;
     }
 
-	printf("---------------------------------------- FINISH:  PROCESS_HAVE ----------------------------------------\n");
+	bf_log("---------------------------------------- FINISH:  PROCESS_HAVE ----------------------------------------\n");
     return rv;
 } 
 
 int choose_random_piece_idx()
 {
-	printf("++++++++++++++++++++ START:  CHOOSE_RANDOM_PIECE_IDX +++++++++++++++++++++++\n");
+	bf_log("++++++++++++++++++++ START:  CHOOSE_RANDOM_PIECE_IDX +++++++++++++++++++++++\n");
     int i, r, random_piece_idx;
       
     random_piece_idx = -1;
@@ -1063,6 +1067,6 @@ int choose_random_piece_idx()
         }
     }
       
-	printf("---------------------------------------- FINISH:  CHOOSE_RANDOM_PIECE_IDX  ----------------------------------------\n");
+	bf_log("---------------------------------------- FINISH:  CHOOSE_RANDOM_PIECE_IDX  ----------------------------------------\n");
     return random_piece_idx;
 }
