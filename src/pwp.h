@@ -505,7 +505,7 @@ int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t *msg)
         tv.tv_usec = 0;
         // TODO: the for-loop to keep receiving until we have received the 4 bytes which specify length.
         rv = select(socketfd + 1, recvfd, NULL, NULL, &tv);
-        bf_log("[LOG] get_len: value of 'rv' after select: %d (1=OK; 0=timeout; -1=error)\n", rv);
+        bf_log("[LOG] receive_msg_for_len: value of 'rv' after select: %d (1=OK; 0=timeout; -1=error)\n", rv);
 
         if(rv == -1)
         {
@@ -521,6 +521,7 @@ int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t *msg)
         {
                 if((rv = recv(socketfd, curr + r_bytes, len - r_bytes, 0)) <= 0)
                 {
+			bf_log("[ERROR]receive_msg_for_len: Peer closed connection");
                         return RECV_ERROR;
                 }
         }
