@@ -830,18 +830,19 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 		msg_id = *msg;
 		if(msg_id != PIECE_MSG_ID)
 		{
-			bf_log("[LOG] download_block: the message is not PIECE message.\n");
+			bf_log("[LOG] download_block: the message is not PIECE message. Message Id: %d; Message Length (excluding 4 bytes for length): %d\n", msg_id, len);
 			temp = malloc(len + 4);
-			rv = receive_msg_for_len(socketfd, &recvfd, len, msg); 
+			rv = receive_msg_for_len(socketfd, &recvfd, len - 1, msg); 
 			if(rv != RECV_OK)
 			{
+				bf_log("[ERROR] download_block: got a problem reading message. Message Id: %d\n", msg_id);
 				rv = RECV_ERROR;
 				goto cleanup;
 			}
 			len = htonl(len);
 			memcpy(temp, &len, 4);
 			memcpy(temp + 4, &msg_id, 1);
-			memcpy(temp + 5, msg, ntohl(len));			
+			memcpy(temp + 5, msg, ntohl(len) - 1);			
 			process_msgs(temp, len, 0, peer);
 			free(temp);
 			temp = NULL;
