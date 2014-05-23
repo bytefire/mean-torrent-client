@@ -3,6 +3,7 @@
 #include<stdarg.h>
 #include<time.h>
 #include<string.h>
+#include<stdint.h>
 
 FILE *logfp = NULL;
 char *logfn = NULL;
