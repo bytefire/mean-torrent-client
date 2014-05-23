@@ -275,11 +275,13 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 		goto cleanup;
 	}
 
+	bf_log("[LOG] Going to connect with the peer.\n");
 	if(connect(socketfd, (struct sockaddr *)&peer, len) == -1)
         {
                 perror("connect");
                 return -1;
         }
+	bf_log("[LOG] Connected successfully.\n");
 
 	/*********** SEND HANDSHAKE ****************/
 	bf_log("[LOG] Sent handshake.\n");
@@ -692,6 +694,7 @@ int get_pieces(int socketfd, struct pwp_peer *peer)
 {
 	bf_log("++++++++++++++++++++ START:  GET_PIECES +++++++++++++++++++++++\n");
 	int idx = choose_random_piece_idx();
+	bf_log("[LOG] Chose random piece index: %d\n", idx);
 	int rv = download_piece(idx, socketfd, peer);
 
 	bf_log("---------------------------------------- FINISH:  GET_PIECES----------------------------------------\n");
@@ -895,7 +898,7 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 			len = remaining;
 		}
 
-		rv = receive_msg_for_len(socketfd, &recvfd, 4, msg);
+		rv = receive_msg_for_len(socketfd, &recvfd, len, msg);
         	if(rv != RECV_OK)
 	        {
                 	bf_log(  "[ERROR] receive_and_process_piece_msgs(): Failed to receive block data. bytes_saved= %d.\n", bytes_saved);
