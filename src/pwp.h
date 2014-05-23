@@ -64,6 +64,13 @@ struct pwp_block
     uint8_t status;
 };
 
+struct download_piece_args
+{
+	int idx;
+	int socketfd;
+	struct pwp_peer *peer;
+};
+
 struct pwp_piece *pieces = NULL;
 long int piece_length = -1;
 long int num_of_pieces = -1;
@@ -86,7 +93,7 @@ int process_have(uint8_t *msg, struct pwp_peer *peer);
 int process_bitfield(uint8_t *msg, struct pwp_peer *peer); 
 int choose_random_piece_idx();
 int get_pieces(int socketfd, struct pwp_peer *peer);
-int download_piece(int idx, int socketfd, struct pwp_peer *peer);
+void *download_piece(void *args);
 uint8_t *prepare_requests(int piece_idx, struct pwp_block *blocks, int num_of_blocks, int max_requests, int *len);
 int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block, struct pwp_peer *peer);
 
@@ -696,13 +703,19 @@ int get_pieces(int socketfd, struct pwp_peer *peer)
 	bf_log("++++++++++++++++++++ START:  GET_PIECES +++++++++++++++++++++++\n");
 	int idx = choose_random_piece_idx();
 	bf_log("[LOG] Chose random piece index: %d\n", idx);
-	int rv = download_piece(idx, socketfd, peer);
+	struct download_piece_args args;
+	args.idx = idx;
+	args.socketfd = socketfd;
+	args.peer = peer;
+	int rv = 0; // TODO: fix rv to contain return value from download_piece method.
+	download_piece((void *)&args);
 
 	bf_log("---------------------------------------- FINISH:  GET_PIECES----------------------------------------\n");
 	return rv;	
 }
 
-int download_piece(int idx, int socketfd, struct pwp_peer *peer)
+void *download_piece(void *ptr)
+//(int idx, int socketfd, struct pwp_peer *peer)
 {
 	bf_log("++++++++++++++++++++ START:  DOWNLOAD_PIECE +++++++++++++++++++++++\n");
     /* TODO:
@@ -721,6 +734,8 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
     11. return 0 or -1 accordingly.
     */
 
+	// set up the args:
+	struct download_piece_args *args = (struct download_piece_args *)ptr;
 	int i, len, rv;
 	uint8_t *requests;
 	struct pwp_block received_block;
@@ -748,17 +763,17 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 	}
 
 // No 4 to 8 above:
-	requests = prepare_requests(idx, blocks, num_of_blocks, 1, &len);
+	requests = prepare_requests(args->idx, blocks, num_of_blocks, 1, &len);
 	while(requests)
 	{
-		if(send(socketfd, requests, len, 0) == -1)
+		if(send(args->socketfd, requests, len, 0) == -1)
         	{
 		        perror("send");
 		        rv = -1;
 		        goto cleanup;
         	}
 		bf_log("[LOG] Sent piece requests. Receiving response now.\n");
-		while((rv = download_block(socketfd, idx, &received_block, peer)) == RECV_OK)
+		while((rv = download_block(args->socketfd, args->idx, &received_block, args->peer)) == RECV_OK)
 		{
 			bf_log("[LOG] Successfully downloaded one block :)\n");
 			// calculate block index
@@ -774,7 +789,7 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 		
 		free(requests);
 		requests = NULL;
-		requests = prepare_requests(idx, blocks, num_of_blocks, 1, &len);
+		requests = prepare_requests(args->idx, blocks, num_of_blocks, 1, &len);
 	}
 
 	bf_log("[LOG] *-*-*-*- Downloaded piece!!\n");
@@ -787,7 +802,8 @@ cleanup:
 	{
 		free(requests);
 	}
-	return 0;
+	 // TODO: restore this line: return rv;
+	return NULL;
 } 
 
 int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block, struct pwp_peer *peer)
