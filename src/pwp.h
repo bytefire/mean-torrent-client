@@ -366,11 +366,12 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 		bf_log("[LOG] rv from receive_msg: %d.\n", rv);
         	if(rv == RECV_ERROR)
         	{
+			rv = -1;
                 	goto cleanup;
         	}
 		if(rv == RECV_TO)
 		{
-			rv = 0;
+			rv = -1;
 			goto cleanup;
 		}
 
@@ -389,6 +390,8 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	rv = get_pieces(socketfd, &peer_status);
 
 cleanup:
+	bf_log(" ------------------------------------ FINISH: TALK_TO_PEER  ----------------------------------------\n");	
+
 	bf_log("[LOG] In cleanup.\n");
 	if(socketfd > 0)
 	{
@@ -708,7 +711,10 @@ int get_pieces(int socketfd, struct pwp_peer *peer)
 	args.socketfd = socketfd;
 	args.peer = peer;
 	int rv = 0; // TODO: fix rv to contain return value from download_piece method.
-	download_piece((void *)&args);
+	if(download_piece((void *)&args)) // TODO: temporary: if download_piece returns NULL then it's okay
+	{
+		rv = -1;
+	}
 
 	bf_log("---------------------------------------- FINISH:  GET_PIECES----------------------------------------\n");
 	return rv;	
@@ -739,6 +745,7 @@ void *download_piece(void *ptr)
 	int i, len, rv;
 	uint8_t *requests;
 	struct pwp_block received_block;
+	rv = 0;
 // No 1 above:
 	int num_of_blocks = piece_length / BLOCK_LEN;
 	int bytes_in_last_block = piece_length % BLOCK_LEN;
@@ -796,6 +803,8 @@ void *download_piece(void *ptr)
 // TODO: verify the piece sha1
 	
 
+	rv = 0;
+
 cleanup:
 	bf_log("---------------------------------------- FINISH:  DOWNLOAD_PIECE ----------------------------------------\n");
 	if(requests)
@@ -803,7 +812,14 @@ cleanup:
 		free(requests);
 	}
 	 // TODO: restore this line: return rv;
-	return NULL;
+	if(rv == 0) // TODO: this return value is temporary 
+	{
+		return NULL;
+	}
+	else
+	{
+		return -1;
+	}
 } 
 
 int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block, struct pwp_peer *peer)
