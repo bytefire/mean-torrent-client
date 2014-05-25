@@ -10,6 +10,7 @@
 #include<netinet/in.h>
 #include<arpa/inet.h>
 #include<sys/time.h>
+#include<pthread.h>
 
 #include "bencode.h"
 #include "util.h"
@@ -706,15 +707,21 @@ int get_pieces(int socketfd, struct pwp_peer *peer)
 	bf_log("++++++++++++++++++++ START:  GET_PIECES +++++++++++++++++++++++\n");
 	int idx = choose_random_piece_idx();
 	bf_log("[LOG] Chose random piece index: %d\n", idx);
+
 	struct download_piece_args args;
+	pthread_t thread1;
+	void *thread1_rv;
+
 	args.idx = idx;
 	args.socketfd = socketfd;
 	args.peer = peer;
-	int rv = 0; // TODO: fix rv to contain return value from download_piece method.
-	if(download_piece((void *)&args)) // TODO: temporary: if download_piece returns NULL then it's okay
-	{
-		rv = -1;
-	}
+	int rv = 0;
+	
+	rv = pthread_create(&thread1, NULL, download_piece, (void *)&args);
+
+	pthread_join(thread1, &thread1_rv);
+	// download_piece((void *)&args)
+	rv = (int)thread1_rv;
 
 	bf_log("---------------------------------------- FINISH:  GET_PIECES----------------------------------------\n");
 	return rv;	
@@ -811,15 +818,7 @@ cleanup:
 	{
 		free(requests);
 	}
-	 // TODO: restore this line: return rv;
-	if(rv == 0) // TODO: this return value is temporary 
-	{
-		return NULL;
-	}
-	else
-	{
-		return -1;
-	}
+	return (void *)rv;
 } 
 
 int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block, struct pwp_peer *peer)
