@@ -180,8 +180,9 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
         }
 
 /********** begining of what will be a while loop for every peer ******************/
-	while(bencode_list_has_next(&b2))
+	while(extract_next_peer(&b2, &ip, &port) == 0)
 	{	
+/*
 		bencode_list_get_next(&b2, &b3);
 	
 		// this is a peer in b3 now. b3 is a dictionary.
@@ -208,6 +209,7 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 		port = (uint16_t)num;
 		
 		bf_log("*** Going to process peer: %s:%d\n", ip, port);
+*/
 		rv = talk_to_peer(info_hash, our_peer_id, ip, port);
 		
 		bf_log("[LOG] pwp_start: rv from talk_to_peer is %d.\n\n", rv);
