@@ -718,9 +718,9 @@ int get_pieces(int socketfd, struct pwp_peer *peer)
 	int rv = 0;
 	
 	rv = pthread_create(&thread1, NULL, download_piece, (void *)&args);
+	// TODO: check value of rv to see if thread was successfully created.
 
 	pthread_join(thread1, &thread1_rv);
-	// download_piece((void *)&args)
 	rv = (int)thread1_rv;
 
 	bf_log("---------------------------------------- FINISH:  GET_PIECES----------------------------------------\n");
