@@ -239,6 +239,53 @@ cleanup:
 	return rv;	
 }
 
+int extract_next_peer(bencode_t *list_of_peers, char **ip, uint16_t *port)
+{
+	bf_log("++++++++++++++++++++ START:  EXTRACT_NEXT_PEER +++++++++++++++++++++++\n");
+	int rv = 0;
+	bencode_t b1, b2;
+	const char *str;
+        int len;
+        long int num;
+	
+	if(!bencode_list_has_next(list_of_peers))
+        {
+		bf_log("[LOG] extract_next_peer: no more peers.\n");
+		rv = -1;
+		goto cleanup;
+	}
+        
+	bencode_list_get_next(list_of_peers, &b1);
+
+        // this is a peer in b1 now and b1 is a dictionary.
+        bencode_dict_get_next(&b1, &b2, &str, &len);
+        if(strncmp(str, "ip", 2) != 0)
+        {
+		rv = -1;
+                bf_log("[LOG] Failed to find 'ip' in metadata file.\n");
+                goto cleanup;
+        }
+        bencode_string_value(&b2, &str, &len);
+        *ip = malloc(len + 1); // +1 is to leave space for null terminator char
+        memcpy(*ip, str, len);
+        (*ip)[len] = '\0';
+
+        bencode_dict_get_next(&b1, &b2, &str, &len);
+        if(strncmp(str, "port", 4) != 0)
+        {
+		rv = -1;
+                bf_log(  "Failed to find 'port' in metadata file.\n");
+                goto cleanup;
+        }
+        bencode_int_value(&b2, &num);
+        *port = (uint16_t)num;
+
+cleanup:
+	bf_log(" ------------------------------------ FINISH: EXTRACT_NEXT_PEER ----------------------------------------\n");
+	return rv;
+
+}
+
 int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port)
 {
 	bf_log("++++++++++++++++++++ START:  TALK_TO_PEER +++++++++++++++++++++++\n");
