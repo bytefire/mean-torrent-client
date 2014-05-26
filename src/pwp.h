@@ -182,34 +182,6 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 /********** begining of what will be a while loop for every peer ******************/
 	while(extract_next_peer(&b2, &ip, &port) == 0)
 	{	
-/*
-		bencode_list_get_next(&b2, &b3);
-	
-		// this is a peer in b3 now. b3 is a dictionary.
-		bencode_dict_get_next(&b3, &b4, &str, &len);
-        	if(strncmp(str, "ip", 2) != 0)
-       		{
-                	rv = -1;
-                	bf_log(  "Failed to find 'ip' in metadata file.\n");
-                	goto cleanup;
-        	}
-        	bencode_string_value(&b4, &str, &len);
-		ip = malloc(len + 1); // +1 is to leave space for null terminator char
-		memcpy(ip, str, len);
-		ip[len] = '\0';
-
-		bencode_dict_get_next(&b3, &b4, &str, &len);
-	        if(strncmp(str, "port", 4) != 0)
-       		{
-        	        rv = -1;
-	                bf_log(  "Failed to find 'port' in metadata file.\n");
-                	goto cleanup;
-        	}
-       		bencode_int_value(&b4, &num);
-		port = (uint16_t)num;
-		
-		bf_log("*** Going to process peer: %s:%d\n", ip, port);
-*/
 		rv = talk_to_peer(info_hash, our_peer_id, ip, port);
 		
 		bf_log("[LOG] pwp_start: rv from talk_to_peer is %d.\n\n", rv);
