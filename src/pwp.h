@@ -65,11 +65,12 @@ struct pwp_block
     uint8_t status;
 };
 
-struct download_piece_args
+struct talk_to_peer_args
 {
-	int idx;
-	int socketfd;
-	struct pwp_peer *peer;
+    uint8_t *info_hash;
+    uint8_t *our_peer_id;
+    char *ip;
+    uint16_t port;
 };
 
 struct pwp_piece *pieces = NULL;
@@ -82,7 +83,7 @@ uint8_t *compose_interested(int *len);
 uint8_t *compose_request(int piece_idx, int block_offset, int block_length, int *len);
 
 uint8_t extract_msg_id(uint8_t *response);
-int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port);
+void *talk_to_peer(void *args);
 
 int receive_msg(int socketfd, fd_set *recvfd, uint8_t **msg, int *len);
 int receive_msg_hs(int socketfd, fd_set *recvfd, uint8_t **msg, int *len);
@@ -94,7 +95,7 @@ int process_have(uint8_t *msg, struct pwp_peer *peer);
 int process_bitfield(uint8_t *msg, struct pwp_peer *peer); 
 int choose_random_piece_idx();
 int get_pieces(int socketfd, struct pwp_peer *peer);
-void *download_piece(void *args);
+int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block, struct pwp_peer *peer);
 uint8_t *prepare_requests(int piece_idx, struct pwp_block *blocks, int num_of_blocks, int max_requests, int *len);
 int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block, struct pwp_peer *peer);
 
@@ -180,10 +181,24 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
         }
 
 /********** begining of what will be a while loop for every peer ******************/
+	struct talk_to_peer_args *args;
+	pthread_t thread1;
+	int t1_rv;
+	void *ttp_rv;
 	while(extract_next_peer(&b2, &ip, &port) == 0)
 	{	
-		rv = talk_to_peer(info_hash, our_peer_id, ip, port);
-		
+		args = malloc(sizeof(struct talk_to_peer_args));
+		args->info_hash = info_hash;
+		args->our_peer_id = our_peer_id;
+		args->ip = ip;
+		args->port = port;
+
+		t1_rv = pthread_create(&thread1, NULL, talk_to_peer, (void *)args);
+		pthread_join(thread1, &ttp_rv);
+		rv = (int)ttp_rv;
+		// TODO: join thread and free args
+		free(args);
+
 		bf_log("[LOG] pwp_start: rv from talk_to_peer is %d.\n\n", rv);
 		if(rv == 0)
 		{
@@ -260,7 +275,8 @@ cleanup:
 
 }
 
-int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port)
+// int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t port)
+void *talk_to_peer(void *args)
 {
 	bf_log("++++++++++++++++++++ START:  TALK_TO_PEER +++++++++++++++++++++++\n");
 
@@ -276,15 +292,17 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	int msg_len;	
 	uint8_t *recvd_msg = NULL;
 	struct pwp_peer peer_status;
-	
+
+	struct talk_to_peer_args *ttp_args = (struct talk_to_peer_args *)args;	
+
 	peer_status.unchoked = 0;
 	peer_status.has_pieces = 0;
 	rv = 0;
 	FD_ZERO(&recvfd);
 
-	hs = compose_handshake(info_hash, our_peer_id, &hs_len);
+	hs = compose_handshake(ttp_args->info_hash, ttp_args->our_peer_id, &hs_len);
 	
-	peer_port = htons(port);
+	peer_port = htons(ttp_args->port);
 	if((socketfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
 	{
 		perror("socket");
@@ -297,7 +315,7 @@ int talk_to_peer(uint8_t *info_hash, uint8_t *our_peer_id, char *ip, uint16_t po
 	bzero(&peer, len);
 	peer.sin_family = AF_INET;
 	peer.sin_port = peer_port;
-	if(inet_aton(ip, &peer.sin_addr) == 0)
+	if(inet_aton(ttp_args->ip, &peer.sin_addr) == 0)
 	{
 		bf_log(  "Failed to read in ip address of the peer.\n");
 		rv = -1;
@@ -432,7 +450,7 @@ cleanup:
 		free(recvd_msg);
                 recvd_msg = NULL;
         }
-	return rv;
+	return (void *)rv;
 }
 
 int receive_msg_hs(int socketfd, fd_set *recvfd, uint8_t **msg, int *len)
@@ -728,28 +746,13 @@ int get_pieces(int socketfd, struct pwp_peer *peer)
 	bf_log("++++++++++++++++++++ START:  GET_PIECES +++++++++++++++++++++++\n");
 	int idx = choose_random_piece_idx();
 	bf_log("[LOG] Chose random piece index: %d\n", idx);
-
-	struct download_piece_args args;
-	pthread_t thread1;
-	void *thread1_rv;
-
-	args.idx = idx;
-	args.socketfd = socketfd;
-	args.peer = peer;
-	int rv = 0;
-	
-	rv = pthread_create(&thread1, NULL, download_piece, (void *)&args);
-	// TODO: check value of rv to see if thread was successfully created.
-
-	pthread_join(thread1, &thread1_rv);
-	rv = (int)thread1_rv;
+	int rv = download_piece(idx, socketfd, peer);
 
 	bf_log("---------------------------------------- FINISH:  GET_PIECES----------------------------------------\n");
 	return rv;	
 }
 
-void *download_piece(void *ptr)
-//(int idx, int socketfd, struct pwp_peer *peer)
+int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 {
 	bf_log("++++++++++++++++++++ START:  DOWNLOAD_PIECE +++++++++++++++++++++++\n");
     /* TODO:
@@ -768,12 +771,9 @@ void *download_piece(void *ptr)
     11. return 0 or -1 accordingly.
     */
 
-	// set up the args:
-	struct download_piece_args *args = (struct download_piece_args *)ptr;
 	int i, len, rv;
 	uint8_t *requests;
 	struct pwp_block received_block;
-	rv = 0;
 // No 1 above:
 	int num_of_blocks = piece_length / BLOCK_LEN;
 	int bytes_in_last_block = piece_length % BLOCK_LEN;
@@ -798,17 +798,17 @@ void *download_piece(void *ptr)
 	}
 
 // No 4 to 8 above:
-	requests = prepare_requests(args->idx, blocks, num_of_blocks, 1, &len);
+	requests = prepare_requests(idx, blocks, num_of_blocks, 1, &len);
 	while(requests)
 	{
-		if(send(args->socketfd, requests, len, 0) == -1)
+		if(send(socketfd, requests, len, 0) == -1)
         	{
 		        perror("send");
 		        rv = -1;
 		        goto cleanup;
         	}
 		bf_log("[LOG] Sent piece requests. Receiving response now.\n");
-		while((rv = download_block(args->socketfd, args->idx, &received_block, args->peer)) == RECV_OK)
+		while((rv = download_block(socketfd, idx, &received_block, peer)) == RECV_OK)
 		{
 			bf_log("[LOG] Successfully downloaded one block :)\n");
 			// calculate block index
@@ -824,14 +824,12 @@ void *download_piece(void *ptr)
 		
 		free(requests);
 		requests = NULL;
-		requests = prepare_requests(args->idx, blocks, num_of_blocks, 1, &len);
+		requests = prepare_requests(idx, blocks, num_of_blocks, 1, &len);
 	}
 
 	bf_log("[LOG] *-*-*-*- Downloaded piece!!\n");
 // TODO: verify the piece sha1
 	
-
-	rv = 0;
 
 cleanup:
 	bf_log("---------------------------------------- FINISH:  DOWNLOAD_PIECE ----------------------------------------\n");
@@ -839,7 +837,7 @@ cleanup:
 	{
 		free(requests);
 	}
-	return (void *)rv;
+	return 0;
 } 
 
 int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block, struct pwp_peer *peer)
