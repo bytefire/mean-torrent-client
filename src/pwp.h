@@ -44,6 +44,7 @@
 
 #define SAVED_FILE_PATH "../../files/loff.savedfile"
 #define LOG_FILE "logs/pwp.log"
+#define MAX_THREADS 1
 
 struct pwp_peer
 {
@@ -71,6 +72,12 @@ struct talk_to_peer_args
     uint8_t *our_peer_id;
     char *ip;
     uint16_t port;
+};
+
+struct thread_data
+{
+	struct talk_to_peer_args *args;
+	pthread_t thread_descriptor;
 };
 
 struct pwp_piece *pieces = NULL;
@@ -183,28 +190,38 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 /********** begining of what will be a while loop for every peer ******************/
 	struct talk_to_peer_args *args;
 	pthread_t thread1;
-	int t1_rv;
+	int t1_rv, thread_count;
 	void *ttp_rv;
-	while(extract_next_peer(&b2, &ip, &port) == 0)
+	struct thread_data *td = malloc(MAX_THREADS * sizeof(struct thread_data));
+
+	thread_count = 0;
+	while((extract_next_peer(&b2, &ip, &port) == 0) && (thread_count < MAX_THREADS))
 	{	
 		args = malloc(sizeof(struct talk_to_peer_args));
 		args->info_hash = info_hash;
 		args->our_peer_id = our_peer_id;
 		args->ip = ip;
 		args->port = port;
-
 		t1_rv = pthread_create(&thread1, NULL, talk_to_peer, (void *)args);
-		pthread_join(thread1, &ttp_rv);
-		rv = (int)ttp_rv;
-		// TODO: join thread and free args
-		free(args);
+		
+		td[thread_count].args = args;
+		td[thread_count].thread_descriptor = thread1;
+		
+		thread_count++;
+	}
 
-		bf_log("[LOG] pwp_start: rv from talk_to_peer is %d.\n\n", rv);
-		if(rv == 0)
+	rv = -1;
+	for(thread_count = 0; thread_count < MAX_THREADS; thread_count++)
+	{
+		pthread_join(td[thread_count].thread_descriptor, &ttp_rv);
+		bf_log("[LOG] pwp_start: rv from talk_to_peer thread no: %d is %d.\n\n", thread_count, (int)ttp_rv);
+		free(td[thread_count].args);
+		if(rv != 0)
 		{
-			break;
+			rv = (int)ttp_rv;
 		}
 	}
+	free(td);
 /********** end of what will be while loop for every peer ****************/
 
 cleanup:
