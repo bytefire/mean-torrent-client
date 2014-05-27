@@ -4,9 +4,11 @@
 #include<time.h>
 #include<string.h>
 #include<stdint.h>
+#include<pthread.h>
 
 FILE *logfp = NULL;
 char *logfn = NULL;
+pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
 
 void print_time(FILE *fp)
 {
@@ -19,6 +21,9 @@ void print_time(FILE *fp)
 
 void bf_logger_init(char *filename)
 {
+
+	pthread_mutex_lock(&mutex1);
+
 	logfn = filename;
 	logfp = fopen(logfn, "w");
 	if(!logfp)
@@ -29,10 +34,14 @@ void bf_logger_init(char *filename)
 	}
 	fprintf(logfp, "Start of log file.\n\n");
 	fclose(logfp);
+
+	pthread_mutex_unlock(&mutex1);
 }
 
 int bf_log(const char *format, ...)
 {
+	pthread_mutex_lock(&mutex1);
+	
 	if(!logfn)
 	{
 		fprintf(stderr, "[FROM LOGGER]: unable to log the message as the log file has not been initialised.\n");
@@ -57,11 +66,15 @@ int bf_log(const char *format, ...)
 	
 	fclose(logfp);
 
+	pthread_mutex_unlock(&mutex1);
+
 	return 0;
 }
 
 int bf_log_binary(const char *description, uint8_t *data, int len)
 {
+	pthread_mutex_lock(&mutex1);
+	
 	if(!logfn)
 	{
 		fprintf(stderr, "[FROM LOGGER]: bf_log_binary: unable to log the message as the log file has not been initialised.\n");
@@ -83,7 +96,9 @@ int bf_log_binary(const char *description, uint8_t *data, int len)
 	{
 		fprintf(logfp, "%x", data[i]);
 	}
-	
+
+	pthread_mutex_unlock(&mutex1);	
+
 	return 0;
 }
 
