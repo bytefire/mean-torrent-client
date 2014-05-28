@@ -168,7 +168,7 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 	g_pieces_mutexes = malloc(sizeof(pthread_mutex_t) * g_num_of_pieces);
 	for(i=0; i<g_num_of_pieces; i++)
 	{
-		 g_pieces_mutexes[i] = PTHREAD_MUTEX_INITIALIZER;
+		 pthread_mutex_init(&g_pieces_mutexes[i], NULL);
 	}
 
 	bencode_dict_get_next(&b1, &b2, &str, &len);
