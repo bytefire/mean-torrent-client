@@ -85,7 +85,7 @@ long int g_piece_length = -1;
 long int g_num_of_pieces = -1;
 FILE *g_savedfp = NULL;
 
-pthread_mutex_t g_pieces_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t *g_pieces_mutexes = NULL;
 pthread_mutex_t g_savedfp_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len);
@@ -103,7 +103,7 @@ int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer);
 int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t *msg);
 int process_have(uint8_t *msg, struct pwp_peer *peer);
 int process_bitfield(uint8_t *msg, struct pwp_peer *peer); 
-int choose_random_piece_idx();
+int choose_random_piece_idx(uint8_t *peer_id);
 int are_same_peers(uint8_t *peer_id1, uint8_t *peer_id2);
 int get_pieces(int socketfd, struct pwp_peer *peer);
 int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block, struct pwp_peer *peer);
@@ -117,7 +117,7 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 
 	uint8_t *metadata;
 	const char *str;
-	int len;
+	int len, i;
 	long int num;
 	int rv = 0;
 	bencode_t b1, b2, b3, b4; // bn where n is the level of nestedness
@@ -165,6 +165,11 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
         bencode_int_value(&b2, &g_num_of_pieces);
 	g_pieces = malloc(sizeof(struct pwp_piece) * g_num_of_pieces);
 	bzero(g_pieces, sizeof(struct pwp_piece) * g_num_of_pieces);
+	g_pieces_mutexes = malloc(sizeof(pthread_mutex_t) * g_num_of_pieces);
+	for(i=0; i<g_num_of_pieces; i++)
+	{
+		 g_pieces_mutexes[i] = PTHREAD_MUTEX_INITIALIZER;
+	}
 
 	bencode_dict_get_next(&b1, &b2, &str, &len);
         if(strncmp(str, "piece_length", 12) != 0)
@@ -244,6 +249,16 @@ cleanup:
 	{
 		bf_log("[LOG] pwp_start(): Closing g_savedfp.\n");
 		fclose(g_savedfp);
+	}
+	if(g_pieces)
+	{
+		bf_log("[LOG] pwp_start: freeing g_pieces.\n");
+		free(g_pieces);
+	}
+	if(g_pieces_mutexes)
+	{
+		bf_log("[LOG] pwp_start: freeing g_pieces_mutexes.\n");
+		free(g_pieces_mutexes);
 	}
 	bf_logger_end();
 	return rv;	
@@ -765,21 +780,23 @@ cleanup:
 int get_pieces(int socketfd, struct pwp_peer *peer)
 {
 	bf_log("++++++++++++++++++++ START:  GET_PIECES +++++++++++++++++++++++\n");
-	
-	/* -X-X-X- CRITICAL REGION: so that no two threads select the same piece to download. -X-X-X- */
-	pthread_mutex_lock(&g_pieces_mutex);
 
-	int idx = choose_random_piece_idx();
+	int idx = choose_random_piece_idx(peer->peer_id);
+	// TODO: if no piece index is found then idx will be -1. handle that by simply logging and returning.
+	
+	/*-X-X-X- CRITICAL REGION START -X-X-X-  */
+	pthread_mutex_lock(&g_pieces_mutexes[idx]);
+
 	g_pieces[idx].status = PIECE_STATUS_STARTED;
 
-	pthread_mutex_unlock(&g_pieces_mutex);	
-	/* -X-X-X- END OF CRITICAL REGION -X-X-X- */
+	pthread_mutex_lock(&g_pieces_mutexes[idx]);
+	/*-X-X-X- CRITICAL REGION END -X-X-X-*/
 
 	bf_log("[LOG] Chose random piece index: %d\n", idx);
 	int rv = download_piece(idx, socketfd, peer);
 
-	/* -X-X-X- CRITICAL REGION: updating g_pieces array, so putting it in critical region. -X-X-X- */
-	pthread_mutex_lock(&g_pieces_mutex);
+	/* -X-X-X- CRITICAL REGION START -X-X-X- */
+	pthread_mutex_lock(&g_pieces_mutexes[idx]);
 
 	if(rv == 0)
 	{
@@ -790,8 +807,8 @@ int get_pieces(int socketfd, struct pwp_peer *peer)
 		g_pieces[idx].status = PIECE_STATUS_AVAILABLE;
 	}
 
-	pthread_mutex_unlock(&g_pieces_mutex);
-	/* -X-X-X- END OF CRITICAL REGION -X-X-X- */
+	pthread_mutex_unlock(&g_pieces_mutexes[idx]);
+	/* -X-X-X- CRITICAL REGION END -X-X-X- */
 	
 	bf_log("---------------------------------------- FINISH:  GET_PIECES----------------------------------------\n");
 	return rv;	
@@ -1140,7 +1157,7 @@ int process_have(uint8_t *msg, struct pwp_peer *peer)
     return rv;
 } 
 
-int choose_random_piece_idx()
+int choose_random_piece_idx(uint8_t *peer_id)
 {
 	bf_log("++++++++++++++++++++ START:  CHOOSE_RANDOM_PIECE_IDX +++++++++++++++++++++++\n");
     int i, r, random_piece_idx;
@@ -1151,11 +1168,18 @@ int choose_random_piece_idx()
     for(i=0; i<10; i++) // 10 attempts at getting a random available piece
     {
         r = rand() % g_num_of_pieces;
-        if(g_pieces[r].status == PIECE_STATUS_AVAILABLE)
+	/*-X-X-X- START OF CRITICAL REGION  -X-X-X-*/
+	pthread_mutex_lock(&g_pieces_mutexes[r]);
+
+        if(are_same_peers(g_pieces[r].peer->peer_id, peer_id) && (g_pieces[r].status == PIECE_STATUS_AVAILABLE))
         {
             random_piece_idx = r;
+	    pthread_mutex_unlock(&g_pieces_mutexes[r]);
             break;
         }
+
+	pthread_mutex_unlock(&g_pieces_mutexes[r]);
+	/*-X-X-X- END OF CRITICAL REGION  -X-X-X-*/
     }
       
     // if no piece found after random attempts then go sequentially
@@ -1163,11 +1187,17 @@ int choose_random_piece_idx()
     {
         for(i=0; i<g_num_of_pieces; i++)
         {
-            if(g_pieces[i].status == PIECE_STATUS_AVAILABLE)
+	    /*-X-X-X- START OF CRITICAL REGION  -X-X-X-*/
+            pthread_mutex_lock(&g_pieces_mutexes[i]);
+         
+	   if(are_same_peers(g_pieces[i].peer->peer_id, peer_id) && (g_pieces[i].status == PIECE_STATUS_AVAILABLE))
             {
                 random_piece_idx = i;
+		pthread_mutex_unlock(&g_pieces_mutexes[i]);
                 break;
             }
+	   pthread_mutex_unlock(&g_pieces_mutexes[i]);
+           /*-X-X-X- END OF CRITICAL REGION  -X-X-X-*/
         }
     }
       
