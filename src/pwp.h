@@ -80,10 +80,13 @@ struct thread_data
 	pthread_t thread_descriptor;
 };
 
-struct pwp_piece *pieces = NULL;
-long int piece_length = -1;
-long int num_of_pieces = -1;
-FILE *savedfp = NULL;
+struct pwp_piece *g_pieces = NULL;
+long int g_piece_length = -1;
+long int g_num_of_pieces = -1;
+FILE *g_savedfp = NULL;
+
+pthread_mutex_t g_pieces_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t g_savedfp_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len);
 uint8_t *compose_interested(int *len);
@@ -101,6 +104,7 @@ int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t *msg);
 int process_have(uint8_t *msg, struct pwp_peer *peer);
 int process_bitfield(uint8_t *msg, struct pwp_peer *peer); 
 int choose_random_piece_idx();
+int are_same_peers(uint8_t *peer_id1, uint8_t *peer_id2);
 int get_pieces(int socketfd, struct pwp_peer *peer);
 int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block, struct pwp_peer *peer);
 uint8_t *prepare_requests(int piece_idx, struct pwp_block *blocks, int num_of_blocks, int max_requests, int *len);
@@ -158,9 +162,9 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
                 bf_log(  "Failed to find 'num_of_pieces' in metadata file.\n");
                 goto cleanup;
         }
-        bencode_int_value(&b2, &num_of_pieces);
-	pieces = malloc(sizeof(struct pwp_piece) * num_of_pieces);
-	bzero(pieces, sizeof(struct pwp_piece) * num_of_pieces);
+        bencode_int_value(&b2, &g_num_of_pieces);
+	g_pieces = malloc(sizeof(struct pwp_piece) * g_num_of_pieces);
+	bzero(g_pieces, sizeof(struct pwp_piece) * g_num_of_pieces);
 
 	bencode_dict_get_next(&b1, &b2, &str, &len);
         if(strncmp(str, "piece_length", 12) != 0)
@@ -169,10 +173,10 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
                 bf_log(  "Failed to find 'piece_length' in metadata file.\n");
                 goto cleanup;
         }
-        bencode_int_value(&b2, &piece_length);
+        bencode_int_value(&b2, &g_piece_length);
 	// TODO: create a file whose size is num_of_pieces * piece_length        
-	savedfp = util_create_file_of_size(SAVED_FILE_PATH, num_of_pieces * piece_length);
-	if(!savedfp)
+	g_savedfp = util_create_file_of_size(SAVED_FILE_PATH, g_num_of_pieces * g_piece_length);
+	if(!g_savedfp)
 	{
 		bf_log(  "[ERROR] pwp_start(): Failed to create saved file. Aborting.\n");
 		rv = -1;
@@ -236,10 +240,10 @@ cleanup:
 		bf_log("[LOG] Freeing IP.\n");
 		free(ip);
 	}
-	if(savedfp)
+	if(g_savedfp)
 	{
-		bf_log("[LOG] pwp_start(): Closing savedfp.\n");
-		fclose(savedfp);
+		bf_log("[LOG] pwp_start(): Closing g_savedfp.\n");
+		fclose(g_savedfp);
 	}
 	bf_logger_end();
 	return rv;	
@@ -761,10 +765,34 @@ cleanup:
 int get_pieces(int socketfd, struct pwp_peer *peer)
 {
 	bf_log("++++++++++++++++++++ START:  GET_PIECES +++++++++++++++++++++++\n");
+	
+	/* -X-X-X- CRITICAL REGION: so that no two threads select the same piece to download. -X-X-X- */
+	pthread_mutex_lock(&g_pieces_mutex);
+
 	int idx = choose_random_piece_idx();
+	g_pieces[idx].status = PIECE_STATUS_STARTED;
+
+	pthread_mutex_unlock(&g_pieces_mutex);	
+	/* -X-X-X- END OF CRITICAL REGION -X-X-X- */
+
 	bf_log("[LOG] Chose random piece index: %d\n", idx);
 	int rv = download_piece(idx, socketfd, peer);
 
+	/* -X-X-X- CRITICAL REGION: updating g_pieces array, so putting it in critical region. -X-X-X- */
+	pthread_mutex_lock(&g_pieces_mutex);
+
+	if(rv == 0)
+	{
+		g_pieces[idx].status = PIECE_STATUS_COMPLETE;
+	}
+	else
+	{
+		g_pieces[idx].status = PIECE_STATUS_AVAILABLE;
+	}
+
+	pthread_mutex_unlock(&g_pieces_mutex);
+	/* -X-X-X- END OF CRITICAL REGION -X-X-X- */
+	
 	bf_log("---------------------------------------- FINISH:  GET_PIECES----------------------------------------\n");
 	return rv;	
 }
@@ -791,9 +819,11 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 	int i, len, rv;
 	uint8_t *requests;
 	struct pwp_block received_block;
+
+	rv = 0;
 // No 1 above:
-	int num_of_blocks = piece_length / BLOCK_LEN;
-	int bytes_in_last_block = piece_length % BLOCK_LEN;
+	int num_of_blocks = g_piece_length / BLOCK_LEN;
+	int bytes_in_last_block = g_piece_length % BLOCK_LEN;
 
 	if(bytes_in_last_block)
 	{
@@ -854,7 +884,7 @@ cleanup:
 	{
 		free(requests);
 	}
-	return 0;
+	return rv;
 } 
 
 int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block, struct pwp_peer *peer)
@@ -955,7 +985,7 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 	block->offset = block_offset;
 	bf_log("[LOG] *-*-*- Going to receive piece_idx: %d, block_offset: %d, block length: %d.\n", piece_idx, block_offset, remaining);
 
-	fseek(savedfp, (piece_idx * piece_length) + block_offset, SEEK_SET);
+	fseek(g_savedfp, (piece_idx * g_piece_length) + block_offset, SEEK_SET);
 	len = 512; //use len as buffer for following loop	
 
 	int bytes_saved = 0;
@@ -973,7 +1003,7 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 			rv = RECV_ERROR;
         	        goto cleanup;
 	        }
-	        fwrite(msg, 1, len, savedfp);
+	        fwrite(msg, 1, len, g_savedfp);
 
 		remaining -= len;
 		bytes_saved += len;
@@ -1071,17 +1101,17 @@ int process_bitfield(uint8_t *msg, struct pwp_peer *peer)
             if(bits & mask)
             {
                 idx = i*8 + j;
-                if(idx >= num_of_pieces)
+                if(idx >= g_num_of_pieces)
                 {
                     bf_log(  "[ERROR] Bitfield has more bits set than there are number of pieces.\n");
                     rv = -1;
                     // TODO: Reset all pieces that were set to available for this particular peer.
                     goto cleanup;
                 }
-                if(pieces[idx].status == PIECE_STATUS_NOT_AVAILABLE)
+                if(g_pieces[idx].status == PIECE_STATUS_NOT_AVAILABLE)
                 {
-                    pieces[idx].status = PIECE_STATUS_AVAILABLE;
-                    pieces[idx].peer = peer;
+                    g_pieces[idx].status = PIECE_STATUS_AVAILABLE;
+                    g_pieces[idx].peer = peer;
                 }
             }
             mask = mask / 2;
@@ -1100,10 +1130,10 @@ int process_have(uint8_t *msg, struct pwp_peer *peer)
     uint8_t *curr = msg;
     int idx = ntohl((int)(*(curr+5)));
       
-    if(pieces[idx].status == PIECE_STATUS_NOT_AVAILABLE)
+    if(g_pieces[idx].status == PIECE_STATUS_NOT_AVAILABLE)
     {
-        pieces[idx].status = PIECE_STATUS_AVAILABLE;
-        pieces[idx].peer = peer;
+        g_pieces[idx].status = PIECE_STATUS_AVAILABLE;
+        g_pieces[idx].peer = peer;
     }
 
 	bf_log("---------------------------------------- FINISH:  PROCESS_HAVE ----------------------------------------\n");
@@ -1120,8 +1150,8 @@ int choose_random_piece_idx()
       
     for(i=0; i<10; i++) // 10 attempts at getting a random available piece
     {
-        r = rand() % num_of_pieces;
-        if(pieces[r].status == PIECE_STATUS_AVAILABLE)
+        r = rand() % g_num_of_pieces;
+        if(g_pieces[r].status == PIECE_STATUS_AVAILABLE)
         {
             random_piece_idx = r;
             break;
@@ -1131,9 +1161,9 @@ int choose_random_piece_idx()
     // if no piece found after random attempts then go sequentially
     if(random_piece_idx == -1)
     {
-        for(i=0; i<num_of_pieces; i++)
+        for(i=0; i<g_num_of_pieces; i++)
         {
-            if(pieces[i].status == PIECE_STATUS_AVAILABLE)
+            if(g_pieces[i].status == PIECE_STATUS_AVAILABLE)
             {
                 random_piece_idx = i;
                 break;
@@ -1143,4 +1173,27 @@ int choose_random_piece_idx()
       
 	bf_log("---------------------------------------- FINISH:  CHOOSE_RANDOM_PIECE_IDX  ----------------------------------------\n");
     return random_piece_idx;
+}
+
+int are_same_peers(uint8_t *peer_id1, uint8_t *peer_id2)
+{
+	// TODO: perform bounds checking
+	bf_log("++++++++++++++++++++ START:  ARE_SAME_PEERS +++++++++++++++++++++++\n");
+
+	int rv = 1; // default: are same peers
+	int i;
+	
+	for(i=0; i<20; i++)
+	{
+		if(peer_id1[i] != peer_id2[i])
+		{
+			bf_log("[LOG] are_same_peers(): peers are not the same.\n");
+			rv = 0;
+			break;
+		}
+	}
+
+cleanup:
+	bf_log("---------------------------------------- FINISH:  ARE_SAME_PEERS ----------------------------------------\n");
+	return rv;
 }
