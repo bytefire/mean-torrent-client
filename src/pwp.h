@@ -920,6 +920,7 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 	FD_SET(socketfd, &recvfd);
 	msg = malloc(MAX_DATA_LEN);
 	// NOTE: cannot call receive_msg method above because piece msg will be too long to hold in memory.
+	// TODO: create separate method that handles this scenario as well as receive_msg.
 	while(msg_id != PIECE_MSG_ID)
 	{
 		bf_log("[LOG] Going to get length of message. calling receive_msg_for_len().\n");
@@ -1002,6 +1003,9 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 	block->offset = block_offset;
 	bf_log("[LOG] *-*-*- Going to receive piece_idx: %d, block_offset: %d, block length: %d.\n", piece_idx, block_offset, remaining);
 
+	/* -X-X-X- CRITICAL REGION START (for saved file) -X-X-X- */
+	pthread_mutex_lock(&g_savedfp_mutex);
+
 	fseek(g_savedfp, (piece_idx * g_piece_length) + block_offset, SEEK_SET);
 	len = 512; //use len as buffer for following loop	
 
@@ -1025,6 +1029,10 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 		remaining -= len;
 		bytes_saved += len;
 	}
+
+	pthread_mutex_unlock(&g_savedfp_mutex);
+	/* -X-X-X- CRITICAL REGION END (for saved file) -X-X-X- */
+
 	// if here then the block must have been successfully downloaded. update the block struct.
 	block->status = BLOCK_STATUS_DOWNLOADED;
 
