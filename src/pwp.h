@@ -84,9 +84,11 @@ struct pwp_piece *g_pieces = NULL;
 long int g_piece_length = -1;
 long int g_num_of_pieces = -1;
 FILE *g_savedfp = NULL;
+long int g_downloaded_pieces = 0;
 
 pthread_mutex_t *g_pieces_mutexes = NULL;
 pthread_mutex_t g_savedfp_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t g_downloaded_pieces_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len);
 uint8_t *compose_interested(int *len);
@@ -220,16 +222,63 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 	}
 
 	rv = -1;
+	
+	int count = 0;
+	struct timespec ts;
+	while(count < 3)
+	{
+		// this for loop goes over each thread checking if it has completed. 
+		for(thread_count = 0; thread_count < MAX_THREADS; thread_count++)
+		{
+			clock_gettime(CLOCK_REALTIME, &ts);
+        	        ts.tv_sec += 1;
+	                rv = pthread_timedjoin_np(td[thread_count].thread_descriptor, &ttp_rv, &ts);
+			if(rv == 0) // rv == 0 means that the thread completed execution
+			{
+				// 1. free resources
+				bf_log("[LOG] pwp_start: rv from talk_to_peer thread no: %d is %d.\n\n", thread_count, (int)ttp_rv);
+				free(td[thread_count].args);
+				td[thread_count].args = NULL;
+
+				// 2. start new thread in its place
+				if(extract_next_peer(&b2, &ip, &port) == 0)
+			        {
+		                	args = malloc(sizeof(struct talk_to_peer_args));
+        		        	args->info_hash = info_hash;
+                			args->our_peer_id = our_peer_id;
+	        		        args->ip = ip;
+        		        	args->port = port;
+	               		 	t1_rv = pthread_create(&thread1, NULL, talk_to_peer, (void *)args);
+		
+			                td[thread_count].args = args;
+                			td[thread_count].thread_descriptor = thread1;
+				}
+                	}
+        	}
+	
+		
+
+
+		/* -X-X-X- CRITICAL REGION START -X-X-X- */
+		pthread_mutex_lock(&g_downloaded_pieces_mutex);
+	
+		count = g_downloaded_pieces;
+
+		pthread_mutex_unlock(&g_downloaded_pieces_mutex);
+		/* -X-X-X- CRITICAL REGION END -X-X-X- */
+	}
+	
+	// Final for-loop to ensure that all the threads have joined
 	for(thread_count = 0; thread_count < MAX_THREADS; thread_count++)
 	{
-		pthread_join(td[thread_count].thread_descriptor, &ttp_rv);
-		bf_log("[LOG] pwp_start: rv from talk_to_peer thread no: %d is %d.\n\n", thread_count, (int)ttp_rv);
-		free(td[thread_count].args);
-		if(rv != 0)
+		pthread_join(td[thread_count].thread_descriptor, NULL);
+		if(td[thread_count].args)
 		{
-			rv = (int)ttp_rv;
+			free(td[thread_count].args);
+			td[thread_count].args = NULL;
 		}
 	}
+
 	free(td);
 /********** end of what will be while loop for every peer ****************/
 
@@ -891,6 +940,14 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 		requests = prepare_requests(idx, blocks, num_of_blocks, 1, &len);
 	}
 
+	/* -X-X-X- CRITICAL REGION START -X-X-X- */
+	pthread_mutex_lock(&g_downloaded_pieces_mutex);
+
+	g_downloaded_pieces++;
+
+	pthread_mutex_unlock(&g_downloaded_pieces_mutex);
+	/* -X-X-X- CRITICAL REGION END -X-X-X- */
+
 	bf_log("[LOG] *-*-*-*- Downloaded piece!!\n");
 // TODO: verify the piece sha1
 	
@@ -1004,6 +1061,8 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 	bf_log("[LOG] *-*-*- Going to receive piece_idx: %d, block_offset: %d, block length: %d.\n", piece_idx, block_offset, remaining);
 
 	/* -X-X-X- CRITICAL REGION START (for saved file) -X-X-X- */
+	// TODO: it is possible to remove this critical region and have a separate file for each piece.
+	//	then no locking is used but we need to merge those pieces into a single file after all have been downloaded.
 	pthread_mutex_lock(&g_savedfp_mutex);
 
 	fseek(g_savedfp, (piece_idx * g_piece_length) + block_offset, SEEK_SET);
