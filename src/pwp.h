@@ -245,7 +245,7 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 			if(rv == 0) // rv == 0 means that the thread completed execution
 			{
 				// 1. free resources
-				bf_log("[LOG] pwp_start: rv from talk_to_peer thread no: %d is %d.\n\n", thread_count, (int)ttp_rv);
+				bf_log("[LOG] pwp_start: >>> Thread Completed <<< rv from talk_to_peer thread no: %d is %d.\n\n", thread_count, (int)ttp_rv);
 				free(td[thread_count].args);
 				td[thread_count].args = NULL;
 
@@ -276,7 +276,8 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 		pthread_mutex_unlock(&g_downloaded_pieces_mutex);
 		/* -X-X-X- CRITICAL REGION END -X-X-X- */
 	}
-	
+	bf_log("[LOG] Finished the while loop to download at least 3 pieces.\n");
+		
 	// Final for-loop to ensure that all the threads have joined
 	for(thread_count = 0; thread_count < MAX_THREADS; thread_count++)
 	{
