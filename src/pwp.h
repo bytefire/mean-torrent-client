@@ -53,9 +53,15 @@ struct pwp_peer
 	int has_pieces;
 };
 
-struct pwp_piece
+struct pwp_peer_node // node for linked list of peers
 {
 	struct pwp_peer *peer;
+	struct pwp_peer_node *next;
+};
+
+struct pwp_piece
+{
+	struct pwp_peer_node *peers; // this is the HEAD pointer
 	uint8_t status;
 };
 
@@ -107,6 +113,9 @@ int process_have(uint8_t *msg, struct pwp_peer *peer);
 int process_bitfield(uint8_t *msg, struct pwp_peer *peer); 
 int choose_random_piece_idx(uint8_t *peer_id);
 int are_same_peers(uint8_t *peer_id1, uint8_t *peer_id2);
+void linked_list_add(struct pwp_peer_node **head, struct pwp_peer *peer);
+int linked_list_contains_peer_id(struct pwp_peer_node *head, uint8_t *peer_id);
+void linked_list_free(struct pwp_peer_node **head);
 int get_pieces(int socketfd, struct pwp_peer *peer);
 int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block, struct pwp_peer *peer);
 uint8_t *prepare_requests(int piece_idx, struct pwp_block *blocks, int num_of_blocks, int max_requests, int *len);
@@ -301,6 +310,11 @@ cleanup:
 	}
 	if(g_pieces)
 	{
+		bf_log("[LOG] pwp_start: before freeing g_pieces, freeing linked lists of peers inside each piece.\n");
+		for(i=0; i<g_num_of_pieces; i++)
+		{
+			linked_list_free(&g_pieces[i].peers);
+		}
 		bf_log("[LOG] pwp_start: freeing g_pieces.\n");
 		free(g_pieces);
 	}
@@ -1192,10 +1206,11 @@ int process_bitfield(uint8_t *msg, struct pwp_peer *peer)
                     // TODO: Reset all pieces that were set to available for this particular peer.
                     goto cleanup;
                 }
-                if(g_pieces[idx].status == PIECE_STATUS_NOT_AVAILABLE)
+                if(g_pieces[idx].status != PIECE_STATUS_COMPLETE)
                 {
                     g_pieces[idx].status = PIECE_STATUS_AVAILABLE;
-                    g_pieces[idx].peer = peer;
+		
+		    linked_list_add(&g_pieces[idx].peers, peer);	
                 }
             }
             mask = mask / 2;
@@ -1214,10 +1229,10 @@ int process_have(uint8_t *msg, struct pwp_peer *peer)
     uint8_t *curr = msg;
     int idx = ntohl((int)(*(curr+5)));
       
-    if(g_pieces[idx].status == PIECE_STATUS_NOT_AVAILABLE)
+    if(g_pieces[idx].status != PIECE_STATUS_COMPLETE)
     {
         g_pieces[idx].status = PIECE_STATUS_AVAILABLE;
-        g_pieces[idx].peer = peer;
+        linked_list_add(&g_pieces[idx].peers, peer);
     }
 
 	bf_log("---------------------------------------- FINISH:  PROCESS_HAVE ----------------------------------------\n");
@@ -1238,7 +1253,7 @@ int choose_random_piece_idx(uint8_t *peer_id)
 	/*-X-X-X- START OF CRITICAL REGION  -X-X-X-*/
 	pthread_mutex_lock(&g_pieces_mutexes[r]);
 
-        if(are_same_peers(g_pieces[r].peer->peer_id, peer_id) && (g_pieces[r].status == PIECE_STATUS_AVAILABLE))
+        if(linked_list_contains_peer_id(g_pieces[r].peers, peer_id) && (g_pieces[r].status == PIECE_STATUS_AVAILABLE))
         {
             random_piece_idx = r;
 	    pthread_mutex_unlock(&g_pieces_mutexes[r]);
@@ -1257,7 +1272,7 @@ int choose_random_piece_idx(uint8_t *peer_id)
 	    /*-X-X-X- START OF CRITICAL REGION  -X-X-X-*/
             pthread_mutex_lock(&g_pieces_mutexes[i]);
          
-	   if(are_same_peers(g_pieces[i].peer->peer_id, peer_id) && (g_pieces[i].status == PIECE_STATUS_AVAILABLE))
+	   if(linked_list_contains_peer_id(g_pieces[i].peers, peer_id) && (g_pieces[i].status == PIECE_STATUS_AVAILABLE))
             {
                 random_piece_idx = i;
 		pthread_mutex_unlock(&g_pieces_mutexes[i]);
@@ -1293,4 +1308,65 @@ int are_same_peers(uint8_t *peer_id1, uint8_t *peer_id2)
 cleanup:
 	bf_log("---------------------------------------- FINISH:  ARE_SAME_PEERS ----------------------------------------\n");
 	return rv;
+}
+
+void linked_list_add(struct pwp_peer_node **head, struct pwp_peer *peer)
+{
+	bf_log("++++++++++++++++++++ START:  LINKED_LIST_ADD +++++++++++++++++++++++\n");
+	// special case of head being null
+	if(*head == NULL)
+	{
+		*head = malloc(sizeof(struct pwp_peer_node));
+		(*head)->peer = peer;
+		(*head)->next = NULL;
+		return;
+	}
+
+	// if here then head must not be null
+	struct pwp_peer_node *curr = *head;
+
+	while(curr->next != NULL)
+	{
+		curr = curr->next;
+	}
+	curr->next = malloc(sizeof(struct pwp_peer_node));
+	curr = curr->next;
+	curr->peer = peer;
+	curr->next = NULL;
+	bf_log("---------------------------------------- FINISH:  LINKED_LIST_ADD ----------------------------------------\n");
+}
+
+int linked_list_contains_peer_id(struct pwp_peer_node *head, uint8_t *peer_id)
+{
+	bf_log("++++++++++++++++++++ START:  LINKED_LIST_CONTAINS_PEER_ID +++++++++++++++++++++++\n");
+	int rv = 0;
+
+	while(head)
+	{
+		if(are_same_peers(head->peer->peer_id, peer_id))
+		{
+			rv = 1;
+			break;
+		}
+	}
+
+	bf_log("---------------------------------------- FINISH:  LINKED_LIST_CONTAINS_PEER_ID ----------------------------------------\n");
+	return rv;
+}
+
+void linked_list_free(struct pwp_peer_node **head)
+{
+	bf_log("++++++++++++++++++++ START:  LINKED_LIST_CONTAINS_FREE +++++++++++++++++++++++\n");
+        
+	struct pwp_peer_node *curr, *temp;
+	curr = *head;
+	while(curr)
+	{
+		temp = curr;
+		curr = curr->next;
+		free(temp);
+	}
+	*head = NULL;
+
+        bf_log("---------------------------------------- FINISH:  LINKED_LIST_FREE ----------------------------------------\n");
 }
