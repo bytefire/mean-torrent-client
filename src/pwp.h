@@ -44,7 +44,7 @@
 
 #define SAVED_FILE_PATH "../../files/loff.savedfile"
 #define LOG_FILE "logs/pwp.log"
-#define MAX_THREADS 1
+#define MAX_THREADS 4
 
 struct pwp_peer
 {
@@ -234,7 +234,7 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 	
 	int count = 0;
 	struct timespec ts;
-	while(count < 1)
+	while(count < 3)
 	{
 		// this for loop goes over each thread checking if it has completed. 
 		for(thread_count = 0; thread_count < MAX_THREADS; thread_count++)
@@ -855,7 +855,7 @@ int get_pieces(int socketfd, struct pwp_peer *peer)
 
 	g_pieces[idx].status = PIECE_STATUS_STARTED;
 
-	pthread_mutex_lock(&g_pieces_mutexes[idx]);
+	pthread_mutex_unlock(&g_pieces_mutexes[idx]);
 	/*-X-X-X- CRITICAL REGION END -X-X-X-*/
 
 	bf_log("[LOG] Chose random piece index: %d\n", idx);
@@ -1293,7 +1293,7 @@ int choose_random_piece_idx(uint8_t *peer_id)
 int are_same_peers(uint8_t *peer_id1, uint8_t *peer_id2)
 {
 	// TODO: perform bounds checking
-	bf_log("++++++++++++++++++++ START:  ARE_SAME_PEERS +++++++++++++++++++++++\n");
+//	bf_log("++++++++++++++++++++ START:  ARE_SAME_PEERS +++++++++++++++++++++++\n");
 
 	int rv = 1; // default: are same peers
 	int i;
@@ -1302,20 +1302,20 @@ int are_same_peers(uint8_t *peer_id1, uint8_t *peer_id2)
 	{
 		if(peer_id1[i] != peer_id2[i])
 		{
-			bf_log("[LOG] are_same_peers(): peers are not the same.\n");
+//			bf_log("[LOG] are_same_peers(): peers are not the same.\n");
 			rv = 0;
 			break;
 		}
 	}
 
 cleanup:
-	bf_log("---------------------------------------- FINISH:  ARE_SAME_PEERS ----------------------------------------\n");
+//	bf_log("---------------------------------------- FINISH:  ARE_SAME_PEERS ----------------------------------------\n");
 	return rv;
 }
 
 void linked_list_add(struct pwp_peer_node **head, struct pwp_peer *peer)
 {
-	bf_log("++++++++++++++++++++ START:  LINKED_LIST_ADD +++++++++++++++++++++++\n");
+//	bf_log("++++++++++++++++++++ START:  LINKED_LIST_ADD +++++++++++++++++++++++\n");
 	// special case of head being null
 	if(*head == NULL)
 	{
@@ -1336,12 +1336,12 @@ void linked_list_add(struct pwp_peer_node **head, struct pwp_peer *peer)
 	curr = curr->next;
 	curr->peer = peer;
 	curr->next = NULL;
-	bf_log("---------------------------------------- FINISH:  LINKED_LIST_ADD ----------------------------------------\n");
+//	bf_log("---------------------------------------- FINISH:  LINKED_LIST_ADD ----------------------------------------\n");
 }
 
 int linked_list_contains_peer_id(struct pwp_peer_node *head, uint8_t *peer_id)
 {
-	bf_log("++++++++++++++++++++ START:  LINKED_LIST_CONTAINS_PEER_ID +++++++++++++++++++++++\n");
+//	bf_log("++++++++++++++++++++ START:  LINKED_LIST_CONTAINS_PEER_ID +++++++++++++++++++++++\n");
 	int rv = 0;
 
 	while(head)
@@ -1353,13 +1353,13 @@ int linked_list_contains_peer_id(struct pwp_peer_node *head, uint8_t *peer_id)
 		}
 	}
 
-	bf_log("---------------------------------------- FINISH:  LINKED_LIST_CONTAINS_PEER_ID ----------------------------------------\n");
+//	bf_log("---------------------------------------- FINISH:  LINKED_LIST_CONTAINS_PEER_ID ----------------------------------------\n");
 	return rv;
 }
 
 void linked_list_free(struct pwp_peer_node **head)
 {
-	bf_log("++++++++++++++++++++ START:  LINKED_LIST_CONTAINS_FREE +++++++++++++++++++++++\n");
+//	bf_log("++++++++++++++++++++ START:  LINKED_LIST_FREE +++++++++++++++++++++++\n");
         
 	struct pwp_peer_node *curr, *temp;
 	curr = *head;
@@ -1371,5 +1371,5 @@ void linked_list_free(struct pwp_peer_node **head)
 	}
 	*head = NULL;
 
-        bf_log("---------------------------------------- FINISH:  LINKED_LIST_FREE ----------------------------------------\n");
+//        bf_log("---------------------------------------- FINISH:  LINKED_LIST_FREE ----------------------------------------\n");
 }
