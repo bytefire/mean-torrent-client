@@ -44,7 +44,7 @@
 
 #define SAVED_FILE_PATH "../../files/loff.savedfile"
 #define LOG_FILE "logs/pwp.log"
-#define MAX_THREADS 4
+#define MAX_THREADS 1
 
 struct pwp_peer
 {
@@ -234,7 +234,7 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 	
 	int count = 0;
 	struct timespec ts;
-	while(count < 3)
+	while(count < 1)
 	{
 		// this for loop goes over each thread checking if it has completed. 
 		for(thread_count = 0; thread_count < MAX_THREADS; thread_count++)
@@ -394,6 +394,8 @@ void *talk_to_peer(void *args)
 	struct pwp_peer peer_status;
 
 	struct talk_to_peer_args *ttp_args = (struct talk_to_peer_args *)args;	
+
+	bf_log("*** Going to process peer: %s:%d\n", ttp_args->ip, ttp_args->port);
 
 	peer_status.unchoked = 0;
 	peer_status.has_pieces = 0;
