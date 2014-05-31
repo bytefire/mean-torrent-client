@@ -45,6 +45,7 @@
 #define SAVED_FILE_PATH "../../files/loff.savedfile"
 #define LOG_FILE "logs/pwp.log"
 #define MAX_THREADS 4
+#define PIECES_TO_DOWNLOAD 3
 
 struct pwp_peer
 {
@@ -234,7 +235,7 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 	
 	int count = 0;
 	struct timespec ts;
-	while(count < 3)
+	while(count < PIECES_TO_DOWNLOAD)
 	{
 		// this for loop goes over each thread checking if it has completed. 
 		for(thread_count = 0; thread_count < MAX_THREADS; thread_count++)
@@ -846,36 +847,63 @@ cleanup:
 int get_pieces(int socketfd, struct pwp_peer *peer)
 {
 	bf_log("++++++++++++++++++++ START:  GET_PIECES +++++++++++++++++++++++\n");
-
-	int idx = choose_random_piece_idx(peer->peer_id);
-	// TODO: if no piece index is found then idx will be -1. handle that by simply logging and returning.
-	
-	/*-X-X-X- CRITICAL REGION START -X-X-X-  */
-	pthread_mutex_lock(&g_pieces_mutexes[idx]);
-
-	g_pieces[idx].status = PIECE_STATUS_STARTED;
-
-	pthread_mutex_unlock(&g_pieces_mutexes[idx]);
-	/*-X-X-X- CRITICAL REGION END -X-X-X-*/
-
-	bf_log("[LOG] Chose random piece index: %d\n", idx);
-	int rv = download_piece(idx, socketfd, peer);
+	int count, rv = 0;
 
 	/* -X-X-X- CRITICAL REGION START -X-X-X- */
-	pthread_mutex_lock(&g_pieces_mutexes[idx]);
+        pthread_mutex_lock(&g_downloaded_pieces_mutex);
 
-	if(rv == 0)
-	{
-		g_pieces[idx].status = PIECE_STATUS_COMPLETE;
-	}
-	else
-	{
-		g_pieces[idx].status = PIECE_STATUS_AVAILABLE;
-	}
+        count = g_downloaded_pieces;
 
-	pthread_mutex_unlock(&g_pieces_mutexes[idx]);
-	/* -X-X-X- CRITICAL REGION END -X-X-X- */
+        pthread_mutex_unlock(&g_downloaded_pieces_mutex);
+        /* -X-X-X- CRITICAL REGION END -X-X-X- */
+
+        if(count >= PIECES_TO_DOWNLOAD)
+        {
+                bf_log("[LOG] get_pieces(): Not downloading any further pieces as the desired no of pieces have been downloaded.\n");
+                goto cleanup;
+        }
+
+	int idx = choose_random_piece_idx(peer->peer_id);
 	
+	while(idx != -1) // idx is -1 when no piece to download is found
+	{
+		bf_log("[LOG] Chose random piece index: %d\n", idx);
+		rv = download_piece(idx, socketfd, peer);
+
+		/* -X-X-X- CRITICAL REGION START -X-X-X- */
+		pthread_mutex_lock(&g_pieces_mutexes[idx]);
+
+		if(rv == 0)
+		{
+			g_pieces[idx].status = PIECE_STATUS_COMPLETE;
+		}
+		else
+		{
+			g_pieces[idx].status = PIECE_STATUS_AVAILABLE;
+		}
+
+		pthread_mutex_unlock(&g_pieces_mutexes[idx]);
+		/* -X-X-X- CRITICAL REGION END -X-X-X- */
+
+		/* -X-X-X- CRITICAL REGION START -X-X-X- */
+                pthread_mutex_lock(&g_downloaded_pieces_mutex);
+
+                count = g_downloaded_pieces;
+
+                pthread_mutex_unlock(&g_downloaded_pieces_mutex);
+                /* -X-X-X- CRITICAL REGION END -X-X-X- */
+
+                if(count >= PIECES_TO_DOWNLOAD)
+                {
+                        bf_log("[LOG] get_pieces(): Not downloading any further pieces as the desired no of pieces have been downloaded.\n");
+
+                        break;
+                }	
+
+		idx = choose_random_piece_idx(peer->peer_id);
+	}
+
+cleanup:
 	bf_log("---------------------------------------- FINISH:  GET_PIECES----------------------------------------\n");
 	return rv;	
 }
@@ -1259,6 +1287,8 @@ int choose_random_piece_idx(uint8_t *peer_id)
         if(linked_list_contains_peer_id(g_pieces[r].peers, peer_id) && (g_pieces[r].status == PIECE_STATUS_AVAILABLE))
         {
             random_piece_idx = r;
+	    g_pieces[r].status = PIECE_STATUS_STARTED; // this has to be done in the same critical region as when selecting it.
+							// otherwise two threads can choose same random piece.
 	    pthread_mutex_unlock(&g_pieces_mutexes[r]);
             break;
         }
@@ -1278,6 +1308,8 @@ int choose_random_piece_idx(uint8_t *peer_id)
 	   if(linked_list_contains_peer_id(g_pieces[i].peers, peer_id) && (g_pieces[i].status == PIECE_STATUS_AVAILABLE))
             {
                 random_piece_idx = i;
+		 g_pieces[i].status = PIECE_STATUS_STARTED; // this has to be done in the same critical region as when selecting it.
+                                                        // otherwise two threads can choose same random piece.
 		pthread_mutex_unlock(&g_pieces_mutexes[i]);
                 break;
             }
