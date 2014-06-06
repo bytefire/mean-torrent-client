@@ -11,6 +11,7 @@
 #include<arpa/inet.h>
 #include<sys/time.h>
 #include<pthread.h>
+#include<fcntl.h>
 
 #include "bencode.h"
 #include "util.h"
@@ -388,14 +389,17 @@ void *talk_to_peer(void *args)
 {
 	bf_log("++++++++++++++++++++ START:  TALK_TO_PEER +++++++++++++++++++++++\n");
 
-	int rv;
+	int rv, valopt;
 	int hs_len;
 	uint8_t *hs;
 	int socketfd;
+	long int socket_flags;
 	struct sockaddr_in peer;
+	socklen_t lon;
 	uint16_t peer_port;
 	int len;
 	fd_set recvfd;
+	struct timeval tv;
 	uint8_t *msg;
 	int msg_len;	
 	uint8_t *recvd_msg = NULL;
@@ -409,6 +413,8 @@ void *talk_to_peer(void *args)
 	peer_status.has_pieces = 0;
 	rv = 0;
 	FD_ZERO(&recvfd);
+	tv.tv_sec = 10;
+	tv.tv_usec = 0;
 
 	hs = compose_handshake(ttp_args->info_hash, ttp_args->our_peer_id, &hs_len);
 	
@@ -419,6 +425,13 @@ void *talk_to_peer(void *args)
 		rv = -1;
 		goto cleanup;
 	}
+
+	// set the socket to non-blocking when making connection. we'll set it back to blocking
+	// once it is connected. we set it to non-blocking so that we can do timeout on connect().
+	socket_flags = fcntl(socketfd, F_GETFL, NULL);
+	socket_flags |= O_NONBLOCK;
+	fcntl(socketfd, F_SETFL, socket_flags);
+
 	FD_SET(socketfd, &recvfd);
 
 	len = sizeof(struct sockaddr_in);
@@ -427,17 +440,50 @@ void *talk_to_peer(void *args)
 	peer.sin_port = peer_port;
 	if(inet_aton(ttp_args->ip, &peer.sin_addr) == 0)
 	{
-		bf_log(  "Failed to read in ip address of the peer.\n");
+		bf_log("[ERROR] talk_to_peer(): Failed to read in ip address of the peer.\n");
 		rv = -1;
 		goto cleanup;
 	}
 
 	bf_log("[LOG] Going to connect with the peer.\n");
-	if(connect(socketfd, (struct sockaddr *)&peer, len) == -1)
-        {
-                perror("connect");
-                return -1;
-        }
+	rv = connect(socketfd, (struct sockaddr *)&peer, len);
+
+	if(rv < 0)
+	{
+		if(errno == EINPROGRESS)
+		{
+			if(select(socketfd+1, NULL, &recvfd, NULL, &tv) > 0)
+			{
+				/* >>>>>>>>>>>>>>>>> HERE!!! <<<<<<<<<<<<<<<<<<<*/
+				lon = sizeof(int);
+				getsockopt(socketfd, SOL_SOCKET, SO_ERROR, (void *)(&valopt), &lon);
+				if(valopt)
+				{
+					bf_log("[ERROR] Error in connection() %d - %s\n", valopt, strerror(valopt));
+					rv = -1;
+					goto cleanup;
+				}
+			}
+			else
+			{
+				bf_log("[LOG] Connection either timed out...\n");
+				rv = -1;
+				goto cleanup;
+			}
+		}
+		else
+		{
+			bf_log("[LOG] Got error when connecting to a peer: %d - %s\n", errno, strerror(errno));
+			rv = -1;
+			goto cleanup;
+		}
+	}
+
+	// set the socket back to blocking...
+	socket_flags = fcntl(socketfd, F_GETFL, NULL);
+	socket_flags &= (~O_NONBLOCK);
+	fcntl(socketfd,F_SETFL, socket_flags);
+
 	bf_log("[LOG] Connected successfully.\n");
 
 	/*********** SEND HANDSHAKE ****************/
