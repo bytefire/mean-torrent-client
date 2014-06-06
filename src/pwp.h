@@ -208,7 +208,7 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
                 goto cleanup;
         }
 
-/********** begining of what will be a while loop for every peer ******************/
+
 	struct talk_to_peer_args *args;
 	pthread_t thread1;
 	int t1_rv, thread_count;
@@ -216,6 +216,11 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 	struct thread_data *td = malloc(MAX_THREADS * sizeof(struct thread_data));
 
 	thread_count = 0;
+
+/******** INITIAL loop to start initial MAX_THREADS threads ************/
+
+// NOTE: throughout this application one thread talks to one peer only.
+
 	while((extract_next_peer(&b2, &ip, &port) == 0) && (thread_count < MAX_THREADS))
 	{	
 		args = malloc(sizeof(struct talk_to_peer_args));
@@ -235,6 +240,8 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 	
 	int count = 0;
 	struct timespec ts;
+
+/********** SECOND loop to replace any completed threads with new ones. *******************/
 	while(count < PIECES_TO_DOWNLOAD)
 	{
 		// this for loop goes over each thread checking if it has completed. 
