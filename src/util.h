@@ -24,6 +24,7 @@ int util_read_whole_file(char *filename, uint8_t **contents, int *file_len)
 	*file_len = len;
         fseek(fp, 0L, SEEK_SET);
         (*contents) = malloc(len);
+	// TODO: this fread should be in a loop because a read may return fewer bytes than requested.
         len = fread((*contents), 1, len, fp);
         fclose(fp);
 
@@ -92,4 +93,29 @@ FILE *util_create_file_of_size(const char *file_name, long bytes)
 	fputc('\n', fp);
 	return fp;
 }
+
+int util_read_file_chunk(char *filename, int start_idx, int chunk_len,  uint8_t *contents)
+{
+        FILE *fp;
+        int len = chunk_len;
+
+        if((fp =fopen(filename, "r")) == 0)
+        {
+                fprintf(stderr, "Failed to open file %s.\n", filename);
+                return -1;
+        }
+
+        fseek(fp, start_idx, SEEK_SET);
+
+        while((len = fread(contents, 1, chunk_len, fp)) < chunk_len)
+	{
+		chunk_len = chunk_len - len;
+		contents += len;
+	}
+
+        fclose(fp);
+
+        return 0;
+}
+
 #endif // UTIL_H

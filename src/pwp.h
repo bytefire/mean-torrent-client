@@ -16,6 +16,7 @@
 #include "bencode.h"
 #include "util.h"
 #include "bf_logger.h"
+#include "sha1.h"
 
 #define MAX_DATA_LEN 1024
 
@@ -1026,7 +1027,7 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 			i = received_block.offset/BLOCK_LEN;
 			if(i >=	num_of_blocks)
 			{
-				bf_log(  "[ERROR] download_piece(): block idx (%d) returned >= num_of_blocks (%d).\n", i, num_of_blocks);
+				bf_log("[ERROR] download_piece(): block idx (%d) returned >= num_of_blocks (%d).\n", i, num_of_blocks);
 				rv = -1;
 				goto cleanup;
 			}	
@@ -1048,7 +1049,23 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 
 	bf_log("[LOG] *-*-*-*- Downloaded piece!!\n");
 // TODO: verify the piece sha1
+
+	// TODO: HOW do we take care of length of last piece! it will usually be less than g_piece_length.
+	uint8_t *piece_data = (uint8_t *)malloc(g_piece_length);
+	if(util_read_file_chunk(SAVED_FILE_PATH, idx *  g_piece_length, g_piece_length, piece_data) != 0)
+	{
+		bf_log("[ERROR] download_piece(): Faile to read piece number %d from file, therefore unable to verify SHA1 hash.\n", idx );
+		free(piece_data);
+		piece_data = NULL;
+                rv = -1;
+                goto cleanup;
+	}
 	
+	uint8_t *piece_hash = sha1_compute(piece_data, g_piece_length);
+	// TODO: extract the hash of that piece from somewhere. then compare piece_hash above with that
+
+	free(piece_hash);
+	piece_hash = NULL;	
 
 cleanup:
 	bf_log("---------------------------------------- FINISH:  DOWNLOAD_PIECE ----------------------------------------\n");
