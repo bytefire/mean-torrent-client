@@ -160,10 +160,10 @@ void peers_create_metadata(char *announce, uint8_t *info_hash, uint8_t *our_peer
 		len = strlen(buf);
 		fprintf(fp, "%d:%s", len, buf);
 		fprintf(fp, "4:porti%de", curr->port);
-		fprintf(fp, "6:chokedi0e");
-		fprintf(fp, "8:chokedbyi0e"); // NOTE: other peers unchoked us by default.
-		fprintf(fp, "10:interestedi1e");
-		fprintf(fp, "12:interestedbyi1e"); // NOTE: other peers interested by default.
+		// fprintf(fp, "6:chokedi0e");
+		// fprintf(fp, "8:chokedbyi0e"); // NOTE: other peers unchoked us by default.
+		// fprintf(fp, "10:interestedi1e");
+		// fprintf(fp, "12:interestedbyi1e"); // NOTE: other peers interested by default.
 
 		fprintf(fp, "e"); /*end of dictionary for every peer */
 

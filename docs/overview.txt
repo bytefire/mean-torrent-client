@@ -1,0 +1,29 @@
+OVERVIEW OF BIT-TORRENT CLIENT
+==============================
+
+1. Torrent File ---(HTTP Request)--> Tracker ---(HTTP Response)--> Announce File
+
+2. Announce File ---(peers_create_metadata)--> Metadata File
+
+3. pwp.h uses that metadata file only to download the torrent. Metadata file is in our own format and not a standard format.
+
+
+Format of Metadata File:
+------------------------
+
+Format of metadata file:
+------------------------
+
+Whole file is one bencoded dictionary with following keys.
+
+1. info_hash: 20 byte info hash
+2. our_peer_id: 20 byte our peer id
+3. num_of_pieces (integer): total number of pieces
+4. piece_length (integer): length of each piece in bytes
+5. peers (list of dictionaries): each element is a dictionary with following keys.
+        a. ip
+        b. port
+        c. choked
+        d. chokedby
+        e. interested
+        f. interestedby
