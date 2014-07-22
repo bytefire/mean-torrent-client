@@ -164,7 +164,8 @@ void peers_create_metadata(char *announce, int len, uint8_t *info_hash, uint8_t 
 	fprintf(fp, "e"); /* end of list of peers */
 
 	// TODO: add sha1 hashes of all pieces.
-	// fprintf("
+	fprintf(fp, "12:piece_hashes%d:", piece_hashes_len);
+	fwrite(piece_hashes, 1, piece_hashes_len, fp);
 	// end of root dictionary:
 	fprintf(fp, "e");
 

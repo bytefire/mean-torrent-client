@@ -63,6 +63,7 @@ int util_hex_to_ba(char *hex, uint8_t **ba)
     return 0;
 } 
 
+// TODO: remove this method and use fwrite wherever this method is called.
 void util_append_to_file(char *filename, char *str, int len)
 {
         FILE *fp;
