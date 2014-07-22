@@ -233,9 +233,9 @@ void metafile_print(struct metafile_info *mi)
 
 void metafile_free(struct metafile_info *mi)
 {
-	free((*mi).announce_url);
-	free((*mi).file_name);
+	free(mi->announce_url);
+	free(mi->file_name);
 	free(mi->top_most_directory);
-	free((*mi).pieces);
+	free(mi->pieces);
 	free(mi->info_val);
 }
