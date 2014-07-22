@@ -15,7 +15,7 @@ struct peer
 	struct peer *next;
 };
 
-int peers_extract(char *contents, struct peer **head);
+int peers_extract(char *contents, int len, struct peer **head);
 
 int peers_extract_from_file(char *filename, struct peer **head)
 {
@@ -33,14 +33,14 @@ int peers_extract_from_file(char *filename, struct peer **head)
 	contents = malloc(len);
 	len = fread(contents, 1, len, fp);
 	fclose(fp);
-	rv = peers_extract(contents, head);
+	rv = peers_extract(contents, len, head);
 	free(contents);
 
 	return rv;
 }
-int peers_extract(char *contents, struct peer **head)
+int peers_extract(char *contents, int len, struct peer **head)
 {
-	int len, rv, i;
+	int rv, i;
 	const char *temp, *str;
 	bencode_t b1, b2;// bn where n represents level of nestedness
         struct peer *curr, *next;
@@ -123,11 +123,11 @@ Whole file is one bencoded dictionary with following keys.
 	e. interested
 	f. interestedby
 */
-void peers_create_metadata(char *announce, uint8_t *info_hash, uint8_t *our_peer_id, long int num_of_pieces, long int piece_length)
+void peers_create_metadata(char *announce, int len, uint8_t *info_hash, uint8_t *our_peer_id, long int num_of_pieces, long int piece_length)
 {
 	struct peer *head, *curr;
 	FILE *fp;
-	int len;
+	// int len;
 	char buf[30];
 
 	fp = fopen(METADATA_FILE, "w");
@@ -144,7 +144,7 @@ void peers_create_metadata(char *announce, uint8_t *info_hash, uint8_t *our_peer
         
 	fprintf(fp, "12:piece_lengthi%lde", piece_length);
 	
-	if(peers_extract(announce, &head) != 0)
+	if(peers_extract(announce, len, &head) != 0)
 	{
 		fprintf(stderr, "Got problem while extracting peers from announce file.\n");
 		goto cleanup;
