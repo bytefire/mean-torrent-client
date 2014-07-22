@@ -118,17 +118,14 @@ Whole file is one bencoded dictionary with following keys.
 5. peers (list of dictionaries): each element is a dictionary with following keys.
 	a. ip
 	b. port
-	c. choked
-	d. chokedby
-	e. interested
-	f. interestedby
+6. piece_hashes: sha1 hashes of all the pieces.
 */
-void peers_create_metadata(char *announce, int len, uint8_t *info_hash, uint8_t *our_peer_id, long int num_of_pieces, long int piece_length)
+void peers_create_metadata(char *announce, int len, uint8_t *info_hash, uint8_t *piece_hashes, uint8_t *our_peer_id, long int num_of_pieces, long int piece_length)
 {
 	struct peer *head, *curr;
 	FILE *fp;
-	// int len;
 	char buf[30];
+	int piece_hashes_len = num_of_pieces * 20; // where 20 is length of sha1 hash
 
 	fp = fopen(METADATA_FILE, "w");
 	
@@ -160,16 +157,14 @@ void peers_create_metadata(char *announce, int len, uint8_t *info_hash, uint8_t 
 		len = strlen(buf);
 		fprintf(fp, "%d:%s", len, buf);
 		fprintf(fp, "4:porti%de", curr->port);
-		// fprintf(fp, "6:chokedi0e");
-		// fprintf(fp, "8:chokedbyi0e"); // NOTE: other peers unchoked us by default.
-		// fprintf(fp, "10:interestedi1e");
-		// fprintf(fp, "12:interestedbyi1e"); // NOTE: other peers interested by default.
-
 		fprintf(fp, "e"); /*end of dictionary for every peer */
 
 		curr = curr->next;
 	}
 	fprintf(fp, "e"); /* end of list of peers */
+
+	// TODO: add sha1 hashes of all pieces.
+	// fprintf("
 	// end of root dictionary:
 	fprintf(fp, "e");
 

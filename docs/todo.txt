@@ -1,5 +1,5 @@
 (done) 1. test reading a chunk from file
-2. test the creation of meatadata file without extra four fields
+(done) 2. test the creation of meatadata file without extra four fields
 3. add 'pieces' (concatenation of sha1 hashes of all pieces) from torrent file into the metadata file.
 4. write method to load sha1 of a given piece index from metadata file (where will that code go?)
 5. compare the computed sha1 with the one extracted from metadata file.

@@ -14,12 +14,12 @@ struct metafile_info
 	long int length;
 	long int piece_length;
 	long int num_of_pieces;
-	char (*pieces)[20];
+	char *pieces;
 	int info_len;
 	uint8_t *info_val;
 };
 
-void split_sha1s(char *sha1_str, int len, struct metafile_info *mi);
+// void split_sha1s(char *sha1_str, int len, struct metafile_info *mi);
 
 int parse_multiple_files(bencode_t *files_list, struct metafile_info *mi);
 
@@ -27,7 +27,7 @@ int read_metafile(char *filename, struct metafile_info *mi)
 {
 	FILE *fp;
 	int len, rv;
-	char *contents, *temp;
+	char *contents;
 	const char *str;
 	bencode_t b1, b2, b3; // bn where n represents level of nestedness
 
@@ -134,16 +134,15 @@ int read_metafile(char *filename, struct metafile_info *mi)
         }
 	bencode_string_value(&b3, &str, &len);
 	printf("Length: %d. Num pieces: %d\n", len, len/20);
-	temp = calloc(len + 1, 1);
-	memcpy(temp, str, len);
-	split_sha1s(temp, len, mi);
-	free(temp);
+	mi->pieces = (uint8_t *)malloc(len);
+	memcpy((char *)(mi->pieces), str, len);
 
 cleanup:
 	free(contents);
 	return rv;
 }
 
+/*
 // len param is needed because if we do strlen then we can hit a null character in middle of sha1_str which is a
 // binray string
 void split_sha1s(char *sha1_str, int len, struct metafile_info *mi)
@@ -167,6 +166,7 @@ void split_sha1s(char *sha1_str, int len, struct metafile_info *mi)
 		input += 20;
 	}
 }
+*/
 
 int parse_multiple_files(bencode_t *files_list, struct metafile_info *mi)
 {
