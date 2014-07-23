@@ -94,6 +94,7 @@ long int g_piece_length = -1;
 long int g_num_of_pieces = -1;
 FILE *g_savedfp = NULL;
 long int g_downloaded_pieces = 0;
+uint8_t *g_piece_hashes;
 
 pthread_mutex_t *g_pieces_mutexes = NULL;
 pthread_mutex_t g_savedfp_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -170,6 +171,17 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
         memcpy(our_peer_id, str, len);
 
 	bencode_dict_get_next(&b1, &b2, &str, &len);
+        if(strncmp(str, "piece_hashes", 12) != 0)
+        {
+                rv = -1;
+                bf_log(  "Failed to find 'piece_hashes' in metadata file.\n");
+                goto cleanup;
+        }
+        bencode_string_value(&b2, &str, &len);
+	g_piece_hashes = malloc(len);
+        memcpy(g_piece_hashes, str, len);
+
+	bencode_dict_get_next(&b1, &b2, &str, &len);
         if(strncmp(str, "num_of_pieces", 13) != 0)
         {
                 rv = -1;
@@ -214,7 +226,7 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 	struct talk_to_peer_args *args;
 	pthread_t thread1;
 	int t1_rv, thread_count;
-	void *ttp_rv;
+	void *ttp_rv;		
 	struct thread_data *td = malloc(MAX_THREADS * sizeof(struct thread_data));
 
 	thread_count = 0;
@@ -334,6 +346,12 @@ cleanup:
 		bf_log("[LOG] pwp_start: freeing g_pieces_mutexes.\n");
 		free(g_pieces_mutexes);
 	}
+	if(g_piece_hashes)
+        {
+                bf_log("[LOG] pwp_start: freeing g_piece_hashes.\n");
+                free(g_piece_hashes);
+        }
+	
 	bf_logger_end();
 	return rv;	
 }

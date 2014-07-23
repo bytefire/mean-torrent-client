@@ -115,10 +115,10 @@ Whole file is one bencoded dictionary with following keys.
 2. our_peer_id: 20 byte our peer id
 3. num_of_pieces (integer): total number of pieces
 4. piece_length (integer): length of each piece in bytes
-5. peers (list of dictionaries): each element is a dictionary with following keys.
+5. piece_hashes: sha1 hashes of all the pieces.
+6. peers (list of dictionaries): each element is a dictionary with following keys.
 	a. ip
 	b. port
-6. piece_hashes: sha1 hashes of all the pieces.
 */
 void peers_create_metadata(char *announce, int len, uint8_t *info_hash, uint8_t *piece_hashes, uint8_t *our_peer_id, long int num_of_pieces, long int piece_length)
 {
@@ -140,7 +140,11 @@ void peers_create_metadata(char *announce, int len, uint8_t *info_hash, uint8_t 
 	fprintf(fp, "13:num_of_piecesi%lde", num_of_pieces);
         
 	fprintf(fp, "12:piece_lengthi%lde", piece_length);
-	
+
+	// piece sha1 hashes
+	fprintf(fp, "12:piece_hashes%d:", piece_hashes_len);
+        fwrite(piece_hashes, 1, piece_hashes_len, fp);	
+
 	if(peers_extract(announce, len, &head) != 0)
 	{
 		fprintf(stderr, "Got problem while extracting peers from announce file.\n");
@@ -163,9 +167,6 @@ void peers_create_metadata(char *announce, int len, uint8_t *info_hash, uint8_t 
 	}
 	fprintf(fp, "e"); /* end of list of peers */
 
-	// TODO: add sha1 hashes of all pieces.
-	fprintf(fp, "12:piece_hashes%d:", piece_hashes_len);
-	fwrite(piece_hashes, 1, piece_hashes_len, fp);
 	// end of root dictionary:
 	fprintf(fp, "e");
 
