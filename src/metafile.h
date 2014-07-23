@@ -133,7 +133,8 @@ int read_metafile(char *filename, struct metafile_info *mi)
                 goto cleanup;
         }
 	bencode_string_value(&b3, &str, &len);
-	printf("Length: %d. Num pieces: %d\n", len, len/20);
+	mi->num_of_pieces = len/20;
+	printf("Length: %d. Num pieces: %d\n", len, mi->num_of_pieces);
 	mi->pieces = (uint8_t *)malloc(len);
 	memcpy((char *)(mi->pieces), str, len);
 
