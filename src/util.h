@@ -73,11 +73,16 @@ void util_append_to_file(char *filename, char *str, int len)
                 fprintf(stderr, "Failed to open file.\n");
                 return;
         }
-        int i;
-        for(i = 0; i<len; i++)
-        {
-                fputc(str[i], fp);
-        }
+
+
+	int bytes_written = 0;
+	while(len > 0)
+	{
+		bytes_written = fwrite(str, 1, len, fp);
+		len -= bytes_written;
+		str += bytes_written;
+	}
+
         fclose(fp);
 }
 
