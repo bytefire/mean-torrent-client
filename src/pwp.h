@@ -1066,7 +1066,6 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 	/* -X-X-X- CRITICAL REGION END -X-X-X- */
 
 	bf_log("[LOG] *-*-*-*- Downloaded piece!!\n");
-// TODO: verify the piece sha1
 
 	// TODO: HOW do we take care of length of last piece! it will usually be less than g_piece_length.
 	uint8_t *piece_data = (uint8_t *)malloc(g_piece_length);
@@ -1080,7 +1079,23 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 	}
 	
 	uint8_t *piece_hash = sha1_compute(piece_data, g_piece_length);
-	// TODO: extract the hash of that piece from somewhere. then compare piece_hash above with that
+
+	// compute the index of first byte of the actual piece hash inside the global piece hashes string
+	i = idx * 20;
+	uint8_t *actual_sha1 = g_piece_hashes + i;
+	for(i=0; i<20; i++)
+	{
+		if(piece_hash[i] != actual_sha1[i])
+		{
+			bf_log("[ERROR] download_piece(): Verification of SHA1 piece number %d failed.\n", idx );
+	                bf_log_binary("  > Computed piece hash: ", piece_hash, 20);
+			bf_log_binary("  > Actual piece hash: ", actual_sha1, 20);
+			free(piece_hash);
+        	        piece_hash = NULL;
+                	rv = -1;
+                	goto cleanup;
+		}
+	}
 
 	free(piece_hash);
 	piece_hash = NULL;	
