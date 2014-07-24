@@ -171,17 +171,6 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
         memcpy(our_peer_id, str, len);
 
 	bencode_dict_get_next(&b1, &b2, &str, &len);
-        if(strncmp(str, "piece_hashes", 12) != 0)
-        {
-                rv = -1;
-                bf_log(  "Failed to find 'piece_hashes' in metadata file.\n");
-                goto cleanup;
-        }
-        bencode_string_value(&b2, &str, &len);
-	g_piece_hashes = malloc(len);
-        memcpy(g_piece_hashes, str, len);
-
-	bencode_dict_get_next(&b1, &b2, &str, &len);
         if(strncmp(str, "num_of_pieces", 13) != 0)
         {
                 rv = -1;
@@ -189,22 +178,35 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
                 goto cleanup;
         }
         bencode_int_value(&b2, &g_num_of_pieces);
-	g_pieces = malloc(sizeof(struct pwp_piece) * g_num_of_pieces);
-	bzero(g_pieces, sizeof(struct pwp_piece) * g_num_of_pieces);
-	g_pieces_mutexes = malloc(sizeof(pthread_mutex_t) * g_num_of_pieces);
-	for(i=0; i<g_num_of_pieces; i++)
-	{
-		 pthread_mutex_init(&g_pieces_mutexes[i], NULL);
-	}
 
-	bencode_dict_get_next(&b1, &b2, &str, &len);
+	g_pieces = malloc(sizeof(struct pwp_piece) * g_num_of_pieces);
+        bzero(g_pieces, sizeof(struct pwp_piece) * g_num_of_pieces);
+        g_pieces_mutexes = malloc(sizeof(pthread_mutex_t) * g_num_of_pieces);
+        for(i=0; i<g_num_of_pieces; i++)
+        {
+                 pthread_mutex_init(&g_pieces_mutexes[i], NULL);
+        }
+
+        bencode_dict_get_next(&b1, &b2, &str, &len);
         if(strncmp(str, "piece_length", 12) != 0)
         {
                 rv = -1;
                 bf_log(  "Failed to find 'piece_length' in metadata file.\n");
                 goto cleanup;
         }
-        bencode_int_value(&b2, &g_piece_length);
+        bencode_int_value(&b2, &g_piece_length);	
+
+	bencode_dict_get_next(&b1, &b2, &str, &len);
+        if(strncmp(str, "piece_hashes", 12) != 0)
+        {
+                rv = -1;
+                bf_log(  "Failed to find 'piece_hashes' in metadata file.\n");
+                goto cleanup;
+        }
+        bencode_string_value(&b2, &str, &len);
+        g_piece_hashes = malloc(len);
+        memcpy(g_piece_hashes, str, len);
+	
 	// TODO: create a file whose size is num_of_pieces * piece_length        
 	g_savedfp = util_create_file_of_size(SAVED_FILE_PATH, g_num_of_pieces * g_piece_length);
 	if(!g_savedfp)
@@ -221,7 +223,6 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 		bf_log(  "Failed to find 'peers' in metadata file.\n");
                 goto cleanup;
         }
-
 
 	struct talk_to_peer_args *args;
 	pthread_t thread1;
