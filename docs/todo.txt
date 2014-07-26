@@ -5,7 +5,13 @@
 (done) 4. write method to load sha1 of a given piece index from metadata file (where will that code go?)
 (done) 5. compare the computed sha1 with the one extracted from metadata file.
 (done) 6. remove util_append_to_file method and replace its calls with fwrite.
-6. test the comparison of sha1's.
-7. in util_read_whole_file(), put the single fread inside a loop.
+(done) 6. test the comparison of sha1's.
+(done) 7. in util_read_whole_file(), put the single fread inside a loop.
 8. in pwp.h, remove g_savedfp and g_savedfp_mutex. each piece_download() method should create its own savedfp. that wouldn't conflict because each thread would be writing to a different part of the savedfile, i.e. no two threads can be downloading the same piece simultaneously.
 ---------------------------------
+
+long-term:
+==========
+
+1. connect client to pwp_start
+2. ability to resume download
