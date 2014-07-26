@@ -1069,7 +1069,11 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 	bf_log("[LOG] *-*-*-*- Downloaded piece!!\n");
 
 	// TODO: HOW do we take care of length of last piece! it will usually be less than g_piece_length.
-	uint8_t *piece_data = (uint8_t *)malloc(g_piece_length);
+	uint8_t *piece_data = (uint8_t *)malloc(g_piece_length);	
+
+	// flush file buffer before reading the chunk. this is imporant because otherwise sha1 to be computed will be incorrect.
+	fflush(g_savedfp);
+	
 	if(util_read_file_chunk(SAVED_FILE_PATH, idx *  g_piece_length, g_piece_length, piece_data) != 0)
 	{
 		bf_log("[ERROR] download_piece(): Faile to read piece number %d from file, therefore unable to verify SHA1 hash.\n", idx );
@@ -1210,8 +1214,9 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 	bf_log("[LOG] *-*-*- Going to receive piece_idx: %d, block_offset: %d, block length: %d.\n", piece_idx, block_offset, remaining);
 
 	/* -X-X-X- CRITICAL REGION START (for saved file) -X-X-X- */
-	// TODO: it is possible to remove this critical region and have a separate file for each piece.
-	//	then no locking is used but we need to merge those pieces into a single file after all have been downloaded.
+	// TODO: create a separate file pointer in each thread. that way this locking won't be required. 
+	//	that is because each file pointer will be writing in separate locations of the file.
+	//	the aim is to completely remove g_savedfp and g_savedfp_mutex.
 	pthread_mutex_lock(&g_savedfp_mutex);
 
 	fseek(g_savedfp, (piece_idx * g_piece_length) + block_offset, SEEK_SET);
