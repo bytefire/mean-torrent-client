@@ -7,4 +7,5 @@
 (done) 6. remove util_append_to_file method and replace its calls with fwrite.
 6. test the comparison of sha1's.
 7. in util_read_whole_file(), put the single fread inside a loop.
+8. in pwp.h, remove g_savedfp and g_savedfp_mutex. each piece_download() method should create its own savedfp. that wouldn't conflict because each thread would be writing to a different part of the savedfile, i.e. no two threads can be downloading the same piece simultaneously.
 ---------------------------------

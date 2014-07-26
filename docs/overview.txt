@@ -20,10 +20,12 @@ Whole file is one bencoded dictionary with following keys.
 2. our_peer_id: 20 byte our peer id
 3. num_of_pieces (integer): total number of pieces
 4. piece_length (integer): length of each piece in bytes
-5. peers (list of dictionaries): each element is a dictionary with following keys.
+5. piece_hashes (byte string): all the sha1 hashes from torrent file. this is the info hash part of torrent file.
+6. peers (list of dictionaries): each element is a dictionary with following keys.
         a. ip
         b. port
-        c. choked
-        d. chokedby
-        e. interested
-        f. interestedby
+
+Multi-threading:
+----------------
+
+A separate thread is created in pwp_start() to talk to each peer. MAX_THREADS in pwp.h determines maximum number of threads running at a point in time. That is also the maximum number of peers that the application would be talking to simultaneously. Best effort is made to ensure that no two threads download the same piece. Thus each thread should be writing to a different part of the savedfile.
