@@ -121,9 +121,9 @@ void linked_list_add(struct pwp_peer_node **head, struct pwp_peer *peer);
 int linked_list_contains_peer_id(struct pwp_peer_node *head, uint8_t *peer_id);
 void linked_list_free(struct pwp_peer_node **head);
 int get_pieces(int socketfd, struct pwp_peer *peer);
-int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block, struct pwp_peer *peer);
+int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer);
 uint8_t *prepare_requests(int piece_idx, struct pwp_block *blocks, int num_of_blocks, int max_requests, int *len);
-int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block, struct pwp_peer *peer);
+int download_block(int socketfd, int expected_piece_idx, FILE *savedfp, struct pwp_block *block, struct pwp_peer *peer);
 
 int pwp_start(char *md_file)
 {
@@ -951,7 +951,7 @@ int get_pieces(int socketfd, struct pwp_peer *peer)
 	while(idx != -1) // idx is -1 when no piece to download is found
 	{
 		bf_log("[LOG] Chose random piece index: %d\n", idx);
-		rv = download_piece(idx, socketfd, peer);
+		rv = download_piece(idx, socketfd, savedfp, peer);
 
 		/* -X-X-X- CRITICAL REGION START -X-X-X- */
 		pthread_mutex_lock(&g_pieces_mutexes[idx]);
