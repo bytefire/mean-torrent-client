@@ -11,9 +11,6 @@ OVERVIEW OF BIT-TORRENT CLIENT
 Format of Metadata File:
 ------------------------
 
-Format of metadata file:
-------------------------
-
 Whole file is one bencoded dictionary with following keys.
 
 1. info_hash: 20 byte info hash

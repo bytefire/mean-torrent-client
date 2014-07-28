@@ -93,18 +93,19 @@ void util_append_to_file(char *filename, char *str, int len)
         fclose(fp);
 }
 
-FILE *util_create_file_of_size(const char *file_name, long bytes)
+int util_create_file_of_size(const char *file_name, long bytes)
 {
 	FILE *fp = fopen(file_name, "w+");
 	 if(!fp)
         {
                 fprintf(stderr, "[ERROR] util_create_file_of_size(): Failed to create file.\n");
-                return fp;
+                return -1;
         }
 
 	fseek(fp, bytes - 1, SEEK_SET);
 	fputc('\n', fp);
-	return fp;
+	fclose(fp);
+	return 0;
 }
 
 int util_read_file_chunk(char *filename, int start_idx, int chunk_len,  uint8_t *contents)
