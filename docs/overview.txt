@@ -26,3 +26,11 @@ Multi-threading:
 ----------------
 
 A separate thread is created in pwp_start() to talk to each peer. MAX_THREADS in pwp.h determines maximum number of threads running at a point in time. That is also the maximum number of peers that the application would be talking to simultaneously. Best effort is made to ensure that no two threads download the same piece. Thus each thread should be writing to a different part of the savedfile.
+
+Flow of Control from pwp_start():
+---------------------------------
+
+1. pwp_start()
+2. (in a separate thread and upto MAX_THREADS such threads) talk_to_peer(): does handshake etc. if peer doesn't unchoke us, this terminates. otherwise calls get_pieces().
+3. get_pieces(): chooses a random piece index and keeps calling download_piece() in a loop until: a. there is no piece to download (i.e. whole file downloaded) or b. number of downloaded pieces exceded PIECES_TO_DOWNLOAD.
+4. download_pieces(): takes idx, index of the piece to download. this calls download_block() in a loop until the whole piece has been downloaded. then it computes SHA1 of the downloaded piece and validates it against the SHA1 in metadata file (which was originally taken from torrent file).

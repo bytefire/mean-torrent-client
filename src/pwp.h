@@ -92,12 +92,12 @@ struct thread_data
 struct pwp_piece *g_pieces = NULL;
 long int g_piece_length = -1;
 long int g_num_of_pieces = -1;
-FILE *g_savedfp = NULL;
+// FILE *g_savedfp = NULL;
 long int g_downloaded_pieces = 0;
 uint8_t *g_piece_hashes;
 
 pthread_mutex_t *g_pieces_mutexes = NULL;
-pthread_mutex_t g_savedfp_mutex = PTHREAD_MUTEX_INITIALIZER;
+// pthread_mutex_t g_savedfp_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t g_downloaded_pieces_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len);
@@ -208,8 +208,7 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
         memcpy(g_piece_hashes, str, len);
 	
 	// TODO: create a file whose size is num_of_pieces * piece_length        
-	g_savedfp = util_create_file_of_size(SAVED_FILE_PATH, g_num_of_pieces * g_piece_length);
-	if(!g_savedfp)
+	if(util_create_file_of_size(SAVED_FILE_PATH, g_num_of_pieces * g_piece_length) != 0)
 	{
 		bf_log(  "[ERROR] pwp_start(): Failed to create saved file. Aborting.\n");
 		rv = -1;
@@ -327,11 +326,13 @@ cleanup:
 		bf_log("[LOG] Freeing IP.\n");
 		free(ip);
 	}
+/*
 	if(g_savedfp)
 	{
 		bf_log("[LOG] pwp_start(): Closing g_savedfp.\n");
 		fclose(g_savedfp);
 	}
+*/
 	if(g_pieces)
 	{
 		bf_log("[LOG] pwp_start: before freeing g_pieces, freeing linked lists of peers inside each piece.\n");
@@ -937,6 +938,15 @@ int get_pieces(int socketfd, struct pwp_peer *peer)
         }
 
 	int idx = choose_random_piece_idx(peer->peer_id);
+
+	// TODO: declare and initialise savedfp file pointer by opening SAVED_FILE
+	FILE *savedfp = fopen(SAVED_FILE_PATH, "r+");
+         if(!savedfp)
+        {
+                bf_log("[ERROR] get_pieces(): Failed to open saved file. Aborting this thread.\n");
+                rv = -1;
+		goto cleanup;
+        }
 	
 	while(idx != -1) // idx is -1 when no piece to download is found
 	{
@@ -978,10 +988,15 @@ int get_pieces(int socketfd, struct pwp_peer *peer)
 
 cleanup:
 	bf_log("---------------------------------------- FINISH:  GET_PIECES----------------------------------------\n");
+	if(savedfp)
+	{
+		bf_log("[LOG] get_pieces(): closing saved file pointer.\n");
+		fclose(savedfp);
+	}
 	return rv;	
 }
 
-int download_piece(int idx, int socketfd, struct pwp_peer *peer)
+int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer)
 {
 	bf_log("++++++++++++++++++++ START:  DOWNLOAD_PIECE +++++++++++++++++++++++\n");
     /* TODO:
@@ -1039,7 +1054,7 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 		        goto cleanup;
         	}
 		bf_log("[LOG] Sent piece requests. Receiving response now.\n");
-		while((rv = download_block(socketfd, idx, &received_block, peer)) == RECV_OK)
+		while((rv = download_block(socketfd, idx, savedfp,  &received_block, peer)) == RECV_OK)
 		{
 			bf_log("[LOG] Successfully downloaded one block :)\n");
 			// calculate block index
@@ -1072,8 +1087,10 @@ int download_piece(int idx, int socketfd, struct pwp_peer *peer)
 	uint8_t *piece_data = (uint8_t *)malloc(g_piece_length);	
 
 	// flush file buffer before reading the chunk. this is imporant because otherwise sha1 to be computed will be incorrect.
-	fflush(g_savedfp);
-	
+	fflush(savedfp);
+
+	// TODO: this can be made to use savedfp rather than openinig the file separately. Take caution that util_read_file_chunk 
+	//	then doesn't change the position of file pointer so as to write at incorrect pos when downloading next piece.	
 	if(util_read_file_chunk(SAVED_FILE_PATH, idx *  g_piece_length, g_piece_length, piece_data) != 0)
 	{
 		bf_log("[ERROR] download_piece(): Faile to read piece number %d from file, therefore unable to verify SHA1 hash.\n", idx );
@@ -1114,7 +1131,7 @@ cleanup:
 	return rv;
 } 
 
-int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block, struct pwp_peer *peer)
+int download_block(int socketfd, int expected_piece_idx, FILE *savedfp, struct pwp_block *block, struct pwp_peer *peer)
 {
 
 	bf_log("++++++++++++++++++++ START:  DOWNLOAD BLOCK +++++++++++++++++++++++\n");
@@ -1217,9 +1234,9 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 	// TODO: create a separate file pointer in each thread. that way this locking won't be required. 
 	//	that is because each file pointer will be writing in separate locations of the file.
 	//	the aim is to completely remove g_savedfp and g_savedfp_mutex.
-	pthread_mutex_lock(&g_savedfp_mutex);
+	// pthread_mutex_lock(&g_savedfp_mutex);
 
-	fseek(g_savedfp, (piece_idx * g_piece_length) + block_offset, SEEK_SET);
+	fseek(savedfp, (piece_idx * g_piece_length) + block_offset, SEEK_SET);
 	len = 512; //use len as buffer for following loop	
 
 	int bytes_saved = 0;
@@ -1237,13 +1254,14 @@ int download_block(int socketfd, int expected_piece_idx, struct pwp_block *block
 			rv = RECV_ERROR;
         	        goto cleanup;
 	        }
-	        fwrite(msg, 1, len, g_savedfp);
+		// TODO: IMPORTANT, this method may not write all len bytes to the file. MUST check the value returned by fwrite here.
+	        fwrite(msg, 1, len, savedfp);
 
 		remaining -= len;
 		bytes_saved += len;
 	}
 
-	pthread_mutex_unlock(&g_savedfp_mutex);
+	// pthread_mutex_unlock(&g_savedfp_mutex);
 	/* -X-X-X- CRITICAL REGION END (for saved file) -X-X-X- */
 
 	// if here then the block must have been successfully downloaded. update the block struct.

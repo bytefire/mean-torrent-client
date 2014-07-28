@@ -1,3 +1,5 @@
+>>> initialise savedfp inside get_pieces().
+
 (done) 1. test reading a chunk from file
 (done) 2. test the creation of meatadata file without extra four fields
 (done) 3. add 'pieces' (concatenation of sha1 hashes of all pieces) from torrent file into the metadata file.
