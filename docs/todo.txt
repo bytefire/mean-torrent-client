@@ -9,7 +9,7 @@
 (done) 7. in util_read_whole_file(), put the single fread inside a loop.
 (done) 8. in pwp.h, remove g_savedfp and g_savedfp_mutex. each piece_download() method should create its own savedfp. that wouldn't conflict because each thread would be writing to a different part of the savedfile, i.e. no two threads can be downloading the same piece simultaneously.
 9. test download with multiple threads after a separate savedfp for each thread.
-10. when validating piece hash, put the check BEFORE updating global variables, so that if the check fails then that piece is marked as not downloaded and available to be downloaded (i.e. some other thread can pick that piece up for download.)
+(done) 10. when validating piece hash, put the check BEFORE updating global variables, so that if the check fails then that piece is marked as not downloaded and available to be downloaded (i.e. some other thread can pick that piece up for download.)
 ---------------------------------
 
 long-term:

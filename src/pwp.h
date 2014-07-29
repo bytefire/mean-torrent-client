@@ -1073,16 +1073,6 @@ int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer)
 		requests = prepare_requests(idx, blocks, num_of_blocks, 1, &len);
 	}
 
-	/* -X-X-X- CRITICAL REGION START -X-X-X- */
-	pthread_mutex_lock(&g_downloaded_pieces_mutex);
-
-	g_downloaded_pieces++;
-
-	pthread_mutex_unlock(&g_downloaded_pieces_mutex);
-	/* -X-X-X- CRITICAL REGION END -X-X-X- */
-
-	bf_log("[LOG] *-*-*-*- Downloaded piece!!\n");
-
 	// TODO: HOW do we take care of length of last piece! it will usually be less than g_piece_length.
 	uint8_t *piece_data = (uint8_t *)malloc(g_piece_length);	
 
@@ -1119,8 +1109,20 @@ int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer)
 		}
 	}
 
+	bf_log("[LOG] download_piece(): Successfulle verified SHA1 of piece at index %d.\n", idx);
+
 	free(piece_hash);
 	piece_hash = NULL;	
+
+	/* -X-X-X- CRITICAL REGION START -X-X-X- */
+        pthread_mutex_lock(&g_downloaded_pieces_mutex);
+
+        g_downloaded_pieces++;
+
+        pthread_mutex_unlock(&g_downloaded_pieces_mutex);
+        /* -X-X-X- CRITICAL REGION END -X-X-X- */
+
+        bf_log("[LOG] *-*-*-*- Downloaded piece!! Piece index: %d.\n", idx);
 
 cleanup:
 	bf_log("---------------------------------------- FINISH:  DOWNLOAD_PIECE ----------------------------------------\n");
