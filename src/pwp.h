@@ -48,7 +48,7 @@
 
 #define SAVED_FILE_PATH "../../files/loff.savedfile"
 #define LOG_FILE "logs/pwp.log"
-#define MAX_THREADS 1
+#define MAX_THREADS 4
 #define PIECES_TO_DOWNLOAD 3
 
 struct pwp_peer

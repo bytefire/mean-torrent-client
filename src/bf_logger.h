@@ -12,6 +12,7 @@ pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
 
 void print_time(FILE *fp)
 {
+	// TODO: find a way to print date in compact format. 
 	time_t timer;
 	time(&timer);
 	char *timestr = ctime(&timer);
@@ -19,9 +20,14 @@ void print_time(FILE *fp)
 	fprintf(fp, "[%s] ", timestr);
 }
 
+void print_thread_id(FILE *fp)
+{
+        pthread_t thread_id = pthread_self();
+        fprintf(fp, "[TID: %d] ", thread_id);
+}
+
 void bf_logger_init(char *filename)
 {
-
 	pthread_mutex_lock(&mutex1);
 
 	logfn = filename;
@@ -56,6 +62,7 @@ int bf_log(const char *format, ...)
 	}
 	
 	print_time(logfp);
+	print_thread_id(logfp);	
 
 	va_list argptr;
 	va_start(argptr, format);
@@ -89,7 +96,8 @@ int bf_log_binary(const char *description, uint8_t *data, int len)
 	}
 
 	print_time(logfp);
-	
+	print_thread_id(logfp);
+
 	fprintf(logfp, description);
 	int i;
 	for(i=0; i<len; i++)

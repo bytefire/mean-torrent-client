@@ -13,7 +13,7 @@
 #define FILE_NAME "/home/bytefire/dev/code/bit-torrent-client/files/loff.torrent"
 //#define FILE_NAME "~/dev/code/bit-torrent-client/files/dbc.torrent"
 #define ANNOUNCE_FILE "/home/bytefire/dev/code/bit-torrent-client/files/loff.announce"
-#define PEER_ID_HEX "dd0e76bcc7f711e3af893c77e686ca85b8f12e22";
+#define PEER_ID_HEX "dd0e76bcc7f711e3af893c77e686ca85b8f12e23";
 
 
 struct buffer_struct
