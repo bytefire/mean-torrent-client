@@ -44,6 +44,8 @@
 #define BLOCK_STATUS_NOT_DOWNLOADED 0
 #define BLOCK_STATUS_DOWNLOADED 1 
 
+#define BLOCK_REQUESTS_COUNT 3 // max no of requests sent every time
+
 #define SAVED_FILE_PATH "../../files/loff.savedfile"
 #define LOG_FILE "logs/pwp.log"
 #define MAX_THREADS 1
@@ -1005,14 +1007,15 @@ int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer)
     3. initialise each pwp_block in the blocks array
     LOOP:
         4. create three REQUEST messages for three blocks which don't have status DOWNLOADED. if no such block then break the loop
-        5. receive PIECE msgs and save data (write different method for piece messages, not receive_msg)
-        6. keep receiving until timeout.
-        7. update 'blocks' array
-        8. go to step 4
+	5. keep a outstanding_requests counter and initialise it to three.
+        6. receive PIECE msgs and save data (write different method for piece messages, not receive_msg)
+        7. keep receiving while decrementing outstanding_reuests, until either outstanding_requests becomes zero or  timeout happens.
+        8. update 'blocks' array
+        9. go to step 4
     END OF LOOP
-    9. compute sha1 of downloaded piece
-    10. verify the sha1 with the one in announce file. (or metada file?)
-    11. return 0 or -1 accordingly.
+    10. compute sha1 of downloaded piece
+    11. verify the sha1 with the one in announce file. (or metada file?)
+    12. return 0 or -1 accordingly.
     */
 
 	int i, len, rv;
@@ -1043,8 +1046,9 @@ int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer)
 		curr[num_of_blocks-1].length = bytes_in_last_block;
 	}
 
-// No 4 to 8 above:
-	requests = prepare_requests(idx, blocks, num_of_blocks, 1, &len);
+// No 4 to p above:
+	requests = prepare_requests(idx, blocks, num_of_blocks, BLOCK_REQUESTS_COUNT, &len);
+	int outstanding_requests = BLOCK_REQUESTS_COUNT;
 	while(requests)
 	{
 		if(send(socketfd, requests, len, 0) == -1)
@@ -1054,7 +1058,7 @@ int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer)
 		        goto cleanup;
         	}
 		bf_log("[LOG] Sent piece requests. Receiving response now.\n");
-		while((rv = download_block(socketfd, idx, savedfp,  &received_block, peer)) == RECV_OK)
+		while(outstanding_requests && (rv = download_block(socketfd, idx, savedfp,  &received_block, peer)) == RECV_OK)
 		{
 			bf_log("[LOG] Successfully downloaded one block :)\n");
 			// calculate block index
@@ -1066,12 +1070,16 @@ int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer)
 				goto cleanup;
 			}	
 			blocks[i].status = received_block.status;
+			outstanding_requests--;
 		}
 		
 		free(requests);
 		requests = NULL;
-		requests = prepare_requests(idx, blocks, num_of_blocks, 1, &len);
+		requests = prepare_requests(idx, blocks, num_of_blocks, BLOCK_REQUESTS_COUNT, &len);
+		outstanding_requests = BLOCK_REQUESTS_COUNT;
 	}
+	free(requests);
+        requests = NULL;
 
 	// TODO: HOW do we take care of length of last piece! it will usually be less than g_piece_length.
 	uint8_t *piece_data = (uint8_t *)malloc(g_piece_length);	
