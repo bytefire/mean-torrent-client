@@ -1425,17 +1425,21 @@ int choose_random_piece_idx(uint8_t *peer_id)
     {
         r = rand() % g_num_of_pieces;
 	/*-X-X-X- START OF CRITICAL REGION  -X-X-X-*/
+	bf_log("[LOG] choose_random_piece_idx(): Found random number. Going to lock g_piece_mutexes[%d].\n", r);
 	pthread_mutex_lock(&g_pieces_mutexes[r]);
+	bf_log("[LOG] choose_random_piece_idx(): Successfully locked g_piece_mutexes[%d].\n", r);
 
         if(linked_list_contains_peer_id(g_pieces[r].peers, peer_id) && (g_pieces[r].status == PIECE_STATUS_AVAILABLE))
         {
             random_piece_idx = r;
 	    g_pieces[r].status = PIECE_STATUS_STARTED; // this has to be done in the same critical region as when selecting it.
 							// otherwise two threads can choose same random piece.
+	    bf_log("[LOG] choose_random_piece_idx(): Found RANDOM available piece. Going to release g_piece_mutexes[%d].\n", r);
 	    pthread_mutex_unlock(&g_pieces_mutexes[r]);
             break;
         }
 
+	bf_log("[LOG] choose_random_piece_idx(): Random piece index not available. Going to release g_piece_mutexes[%d].\n", r);
 	pthread_mutex_unlock(&g_pieces_mutexes[r]);
 	/*-X-X-X- END OF CRITICAL REGION  -X-X-X-*/
     }
@@ -1446,16 +1450,19 @@ int choose_random_piece_idx(uint8_t *peer_id)
         for(i=0; i<g_num_of_pieces; i++)
         {
 	    /*-X-X-X- START OF CRITICAL REGION  -X-X-X-*/
+	    bf_log("[LOG] choose_random_piece_idx(): Sequential search. Going to lock g_piece_mutexes[%d].\n", i);
             pthread_mutex_lock(&g_pieces_mutexes[i]);
          
 	   if(linked_list_contains_peer_id(g_pieces[i].peers, peer_id) && (g_pieces[i].status == PIECE_STATUS_AVAILABLE))
-            {
+           {
                 random_piece_idx = i;
-		 g_pieces[i].status = PIECE_STATUS_STARTED; // this has to be done in the same critical region as when selecting it.
+		g_pieces[i].status = PIECE_STATUS_STARTED; // this has to be done in the same critical region as when selecting it.
                                                         // otherwise two threads can choose same random piece.
+		bf_log("[LOG] choose_random_piece_idx(): Found sequential available piece index. Going to release g_piece_mutexes[%d].\n", i);
 		pthread_mutex_unlock(&g_pieces_mutexes[i]);
                 break;
-            }
+           }
+	   bf_log("[LOG] choose_random_piece_idx(): Sequential piece index is not available. Going to release g_piece_mutexes[%d].\n", i);
 	   pthread_mutex_unlock(&g_pieces_mutexes[i]);
            /*-X-X-X- END OF CRITICAL REGION  -X-X-X-*/
         }
