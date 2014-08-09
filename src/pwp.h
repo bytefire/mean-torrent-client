@@ -287,6 +287,10 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
                 			td[thread_count].thread_descriptor = thread1;
 				}
                 	}
+			else
+			{
+				bf_log("[LOG] ********pwp_start(): Forcibly closed thread %d.\n", td[thread_count].thread_descriptor);
+			}
         	}
 	
 		
@@ -300,12 +304,14 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 		pthread_mutex_unlock(&g_downloaded_pieces_mutex);
 		/* -X-X-X- CRITICAL REGION END -X-X-X- */
 	}
-	bf_log("[LOG] Finished the while loop to download at least 3 pieces.\n");
+	bf_log("[LOG] pwp_start(): Finished the while loop to download at least 3 pieces. Going to join all threads.\n");
 		
 	// Final for-loop to ensure that all the threads have joined
 	for(thread_count = 0; thread_count < MAX_THREADS; thread_count++)
 	{
+		bf_log("[LOG] pwp_start(): Joining thread %d.\n", td[thread_count].thread_descriptor);
 		pthread_join(td[thread_count].thread_descriptor, NULL);
+		 bf_log("[LOG] pwp_start(): Successfully joined thread %d.\n", td[thread_count].thread_descriptor);
 		if(td[thread_count].args)
 		{
 			free(td[thread_count].args);
