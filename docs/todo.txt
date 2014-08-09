@@ -13,6 +13,8 @@
 (done) 11. prepare_requests to also return the number of requests it was able to prepare. in the inner while loop inside download_block() we loop until either we get the number of blocks we requested or it times out. that way we only time out when a request was unfulfilled.
 12. inside bf_logger print date in compact format.
 13. investigate application freezing after downloading desired number of pieces when running multiple threads.
+
+> client.c erroring when creating metadata file. 
 ---------------------------------
 
 long-term:
