@@ -247,8 +247,8 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 		t1_rv = pthread_create(&thread1, NULL, talk_to_peer, (void *)args);
 		
 		td[thread_count].args = args;
-		td[thread_count].thread_descriptor = thread1;
-		
+		td[thread_count].thread_descriptor = thread1;	
+		bf_log("[LOG] pwp_start(): Started a fresh thread with id: %d.\n", thread1);
 		thread_count++;
 	}
 
@@ -269,7 +269,7 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 			if(rv == 0) // rv == 0 means that the thread completed execution
 			{
 				// 1. free resources
-				bf_log("[LOG] pwp_start: >>> Thread Completed <<< rv from talk_to_peer thread no: %d is %d.\n\n", thread_count, (int)ttp_rv);
+				bf_log("[LOG] pwp_start: >>> Thread Completed <<< rv from talk_to_peer thread id: %d is %d.\n\n", td[thread_count].thread_descriptor, (int)ttp_rv);
 				free(td[thread_count].args);
 				td[thread_count].args = NULL;
 
@@ -285,11 +285,12 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 		
 			                td[thread_count].args = args;
                 			td[thread_count].thread_descriptor = thread1;
+					bf_log("[LOG] pwp_start(): Started a replacement thread with id: %d.\n", thread1);
 				}
                 	}
 			else
 			{
-				bf_log("[LOG] ********pwp_start(): Forcibly closed thread %d.\n", td[thread_count].thread_descriptor);
+				bf_log("[LOG] ********pwp_start(): Couldn't join thread %d within timeout.\n", td[thread_count].thread_descriptor);
 			}
         	}
 	
@@ -1375,7 +1376,7 @@ int process_bitfield(uint8_t *msg, struct pwp_peer *peer)
                 idx = i*8 + j;
                 if(idx >= g_num_of_pieces)
                 {
-                    bf_log(  "[ERROR] Bitfield has more bits set than there are number of pieces.\n");
+                    bf_log("[ERROR] process_bitfield(): Bitfield has more bits set than there are number of pieces.\n");
                     rv = -1;
                     // TODO: Reset all pieces that were set to available for this particular peer.
                     goto cleanup;
@@ -1533,6 +1534,8 @@ int linked_list_contains_peer_id(struct pwp_peer_node *head, uint8_t *peer_id)
 			rv = 1;
 			break;
 		}
+
+		head = head->next;
 	}
 
 //	bf_log("---------------------------------------- FINISH:  LINKED_LIST_CONTAINS_PEER_ID ----------------------------------------\n");
