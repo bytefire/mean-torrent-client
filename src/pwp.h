@@ -931,6 +931,7 @@ int get_pieces(int socketfd, struct pwp_peer *peer)
 {
 	bf_log("++++++++++++++++++++ START:  GET_PIECES +++++++++++++++++++++++\n");
 	int count, rv = 0;
+	FILE *savedfp = NULL;
 
 	/* -X-X-X- CRITICAL REGION START -X-X-X- */
         pthread_mutex_lock(&g_downloaded_pieces_mutex);
@@ -948,9 +949,8 @@ int get_pieces(int socketfd, struct pwp_peer *peer)
 
 	int idx = choose_random_piece_idx(peer->peer_id);
 
-	// TODO: declare and initialise savedfp file pointer by opening SAVED_FILE
-	FILE *savedfp = fopen(SAVED_FILE_PATH, "r+");
-         if(!savedfp)
+	savedfp = fopen(SAVED_FILE_PATH, "r+");
+        if(!savedfp)
         {
                 bf_log("[ERROR] get_pieces(): Failed to open saved file. Aborting this thread.\n");
                 rv = -1;
