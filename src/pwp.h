@@ -763,6 +763,7 @@ int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t *msg)
 			bf_log("[ERROR]receive_msg_for_len: Peer closed connection");
                         return RECV_ERROR;
                 }
+		bf_log("[LOG] receive_msg_for_len(): received %d bytes when attempted to receive %d bytes.\n", rv, len - r_bytes); 
         }
 
 	bf_log("---------------------------------------- FINISH:  RECEIVE_MSG_FOR_LEN ----------------------------------------\n");
