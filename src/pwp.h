@@ -322,6 +322,7 @@ bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 
 	free(td);
 /********** end of what will be while loop for every peer ****************/
+	rv = 0; // if here then things have gone according to plan.
 
 cleanup:
 	bf_log(" ------------------------------------ FINISH: PWP_START  ----------------------------------------\n");
@@ -335,13 +336,7 @@ cleanup:
 		bf_log("[LOG] Freeing IP.\n");
 		free(ip);
 	}
-/*
-	if(g_savedfp)
-	{
-		bf_log("[LOG] pwp_start(): Closing g_savedfp.\n");
-		fclose(g_savedfp);
-	}
-*/
+
 	if(g_pieces)
 	{
 		bf_log("[LOG] pwp_start: before freeing g_pieces, freeing linked lists of peers inside each piece.\n");
