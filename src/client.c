@@ -66,11 +66,18 @@ int main(int argc, char *argv[])
 			return -1;
 		}
 	}	
+	// TODO: implement following method.
 	char *filename = extract_file_name(path_to_torrent);
 	// check if folder with the same name as filename exists. if not then create one.
-	if(!/*TODO: check if folder with the name filename exists*/)
+	struct stat s;
+	if(stat(filename, &stat) == -1)
 	{
-		// TODO: create the folder
+		// create the folder
+		if(mkdir(filename, 0700) != 0)
+		{
+			bf_logger("There was an error creating directory %s: %s\n", filename, perror(NULL));
+			goto cleanup;
+		}
 	}
 	if(!/*TODO: check if the folder contains torrent file (i.e. filename+".torrent")*/)
 	{
@@ -128,7 +135,7 @@ int main(int argc, char *argv[])
 	
 	if(util_read_whole_file(ANNOUNCE_FILE, (uint8_t **)(&tracker_response), &len) != 0)
 	{
-		goto cleanup;
+			goto cleanup;
 	}
 	
 	info_hash = sha1_compute(mi.info_val, mi.info_len);
@@ -143,6 +150,11 @@ int main(int argc, char *argv[])
 	printf("LibCurl rules.\n");
 
 cleanup:
+	if(filename)
+	{
+		free(filename);
+	}
+/************************************************************************************************/
 	metafile_free(&mi);
         free(hash);
 	free(request_url);
