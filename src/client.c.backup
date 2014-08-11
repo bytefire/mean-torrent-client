@@ -14,14 +14,7 @@
 //#define FILE_NAME "~/dev/code/bit-torrent-client/files/dbc.torrent"
 #define ANNOUNCE_FILE "/home/bytefire/dev/code/bit-torrent-client/files/loff.announce"
 #define PEER_ID_HEX "dd0e76bcc7f711e3af893c77e686ca85b8f12e24";
-/*********************************************************************/
 
-
-#define USAGE_MESSAGE "Usage: client <path-to-torrent-file> {fresh|new}\n"
-
-#define MODE_DEFAULT 0
-#define MODE_FRESH 1
-#define MODE_NEW 2
 
 struct buffer_struct
 {
@@ -39,69 +32,8 @@ char *make_tracker_http_request(char *request);
 
 void write_to_file(char *str);
 
-int main(int argc, char *argv[])
+int main()
 {
-	if(argc < 2 || argc > 3) 
-	{
-		printf(USAGE_MESSAGE);
-		return -1;
-	}
-
-	char *path_to_torrent = argv[1];
-	// initialise mode
-	int mode = MODE_DEFAULT;
-	if(argc == 3)
-	{
-		if(strcmp(argv[2], "fresh") == 0)
-		{
-			mode = MODE_FRESH;
-		}
-		else if(strcmp(argv[2], "new") == 0)
-		{
-			mode = MODE_NEW;
-		}
-		else
-		{
-			printf(USAGE_MESSAGE);
-			return -1;
-		}
-	}	
-	char *filename = extract_file_name(path_to_torrent);
-	// check if folder with the same name as filename exists. if not then create one.
-	if(!/*TODO: check if folder with the name filename exists*/)
-	{
-		// TODO: create the folder
-	}
-	if(!/*TODO: check if the folder contains torrent file (i.e. filename+".torrent")*/)
-	{
-		// TODO: copy the torrent file into this folder
-	}
-
-	if(mode == MODE_NEW)
-	{
-		// TODO: delete announce file, metadata file, resume file and savedfile file
-	}
-
-	if((!/* TODO: announce file doesn't exist*/) || (mode == MODE_FRESH))
-	{
-		// TODO: create a new announce file
-		// TODO: create a new metadata file
-	}
-
-	if(!/*TODO: resume file doesn't exist*/)
-	{
-		// TODO: create a resume file
-	}
-
-	if(!/*TODO: savedfile doesn't exists*/)
-	{
-		// TODO: create savedfile
-	}
-
-	// TODO: call pwp_start
-
-
-
 	int rv;
 	char *request_url;
 	char *peer_id_hex = PEER_ID_HEX;	
