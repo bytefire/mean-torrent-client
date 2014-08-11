@@ -132,4 +132,16 @@ int util_read_file_chunk(char *filename, int start_idx, int chunk_len,  uint8_t 
         return 0;
 }
 
+// concatenates the two null terminated strings and returns a newly malloc'd combined string.
+char *util_concatenate(char *str1, char *str2)
+{
+	int len = strlen(str1) + strlen(str2);
+	char *combined = (char *)malloc(len);
+
+	strcpy(combined, str1);
+	strcat(combined, str2);
+
+	return combined;
+}
+
 #endif // UTIL_H
