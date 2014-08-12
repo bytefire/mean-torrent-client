@@ -39,8 +39,14 @@ char *make_tracker_http_request(char *request);
 
 void write_to_file(char *str);
 
+char *extract_filename(char *torrent_path);
+
 int main(int argc, char *argv[])
 {
+	char *torrent_filename = NULL;
+	char *filename = NULL;
+	struct stat s;
+
 	if(argc < 2 || argc > 3) 
 	{
 		printf(USAGE_MESSAGE);
@@ -67,21 +73,31 @@ int main(int argc, char *argv[])
 		}
 	}	
 	// TODO: implement following method.
-	char *filename = extract_file_name(path_to_torrent);
+	filename = extract_filename(path_to_torrent);
 	// check if folder with the same name as filename exists. if not then create one.
-	struct stat s;
-	if(stat(filename, &stat) == -1)
+	if(stat(filename, &s) == -1)
 	{
 		// create the folder
 		if(mkdir(filename, 0700) != 0)
 		{
-			bf_logger("There was an error creating directory %s: %s\n", filename, perror(NULL));
+			bf_logger("[ERROR] client.main(): There was an error creating directory %s: %s\n", filename, perror(NULL));
 			goto cleanup;
 		}
 	}
-	if(!/*TODO: check if the folder contains torrent file (i.e. filename+".torrent")*/)
+
+	// move into that directory
+	if(chdir(filename) == -1)
 	{
-		// TODO: copy the torrent file into this folder
+		bf_logger("[ERROR] client.main(): Problem changing to directory %s: %s\n", filename, perror(NULL));
+		goto cleanup;
+	}
+	
+	torrent_filename = util_concatenate(filename, ".torrent");
+	// check if the folder contains torrent file (i.e. filename+".torrent")
+	if(stat(torrent_filename, &s) == -1)
+	{
+		// TODO:  copy the torrent file into this folder
+			// src: path_to_torrent; dest: torrent_filename	
 	}
 
 	if(mode == MODE_NEW)
@@ -154,6 +170,10 @@ cleanup:
 	{
 		free(filename);
 	}
+	if(torrent_filename)
+	{
+		free(torrent_filename);
+	}
 /************************************************************************************************/
 	metafile_free(&mi);
         free(hash);
@@ -165,6 +185,11 @@ cleanup:
 		free(our_peer_id);
 	}
 	return rv;
+}
+
+char *extract_filename(char *torrent_path)
+{
+	// TODO:
 }
 
 // TODO: this method is a candidate for util.h
