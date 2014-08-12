@@ -14,8 +14,9 @@
 12. inside bf_logger print date in compact format.
 (done) 13. investigate application freezing after downloading desired number of pieces when running multiple threads.
 
-14. add a utils.h method to append a string to another string and return a new string. used for generating metadata, resume etc filenames.
-15. add utils.h methods to create and delete files and folders (?)
+(done) 14. add a utils.h method to append a string to another string and return a new string. used for generating metadata, resume etc filenames.
+(done) 15. add utils.h methods to create and delete files and folders (?) ---> actually done inside client.cs rather than util.h
+16. test these two methods individually: extract_filename() in client.c and util_copy_file() in util.h
 ---------------------------------
 
 long-term:

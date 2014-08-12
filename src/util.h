@@ -8,6 +8,8 @@
 #include<stdint.h>
 #include<string.h>
 
+#define BUF_LEN 512
+
 int util_read_whole_file(char *filename, uint8_t **contents, int *file_len)
 {
         FILE *fp;
@@ -146,15 +148,47 @@ char *util_concatenate(char *str1, char *str2)
 
 int util_copy_file(char *src_path, char *dest_path)
 {
+	FILE *src = NULL;
+	FILE *dest = NULL;
+	int rv = 0;
+	uint8_t buf[BUF_LEN];
+	int bytes_read, bytes_written;
+
 	// open source file (src)  using fopen(src_path, "r")
+	if((src =fopen(src_path, "r")) == 0)
+        {
+                fprintf(stderr, "[ERROR] util_copy_file(): Failed to open source file %s.\n", src_path);
+                rv = -1;
+		goto cleanup;
+        }
 	// open destination file (dest) using fopen(dest_path, "w")
+	if((src =fopen(dest_path, "w")) == 0)
+        {
+                fprintf(stderr, "[ERROR] util_copy_file(): Failed to open destination file %s.\n", dest_path);
+                rv = -1;
+                goto cleanup;
+        }
 	// create a buffer (buf) of length 512 bytes
 	// while fread(buf, 1, 512, src) returns a positive number,
 	// 	fwrite(buf, 1, len_read, dest) <--- this will need to go in a loop to ensure all bytes are written
+	while((bytes_read = fread(buf, 1, BUF_LEN, src)) > 0)
+	{
+		bytes_written = 0;
+		while((bytes_written += fwrite(buf + bytes_written, 1, bytes_read - bytes_written, dest)) < bytes_read);
+	}
+cleanup:
 	// close src
+	if(src)
+	{
+		fclose(src);
+	}
 	// close dest
+	if(dest)
+	{
+		fclose(dest);
+	}
 
-	return 0;
+	return rv;
 }
 
 #endif // UTIL_H
