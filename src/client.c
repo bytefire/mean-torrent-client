@@ -187,9 +187,43 @@ cleanup:
 	return rv;
 }
 
-char *extract_filename(char *torrent_path)
+// TODO: could this go into utils.h?
+char *extract_filename(char *path)
 {
-	// TODO:
+	if(path == NULL || strlen(path) == 0)
+	{
+		bf_log("[ERROR] extract_filename(): 'path' is either null or empty.\n");
+                return NULL;
+	}
+	char *last_dot = strrchr(path, '.');
+	if(last_dot == NULL)
+	{
+		bf_log("[ERROR] extract_filename(): 'path' doesn't contain a dot.\n");
+		return NULL;
+	}
+	
+	char *first_char = strrchar(path, '/');
+	if(first_char == NULL)
+	{
+		first_char = path;
+	}
+	else
+	{
+		first_char = first_char + 1;
+	}
+
+	if(first_char >= last_dot)
+	{
+		bf_log("[ERROR] extract_filename(): Last dot occurs before the first character of file name.\n");
+		return NULL;
+	}
+
+	int len = last_dot - first_char + 1;
+	char *filename = (char *)malloc(len);
+	memcpy(filename, first_char, len-1);
+	filename[len-1] = '\0';
+
+	return filename;
 }
 
 // TODO: this method is a candidate for util.h
