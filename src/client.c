@@ -188,6 +188,7 @@ cleanup:
 }
 
 // TODO: could this go into utils.h?
+// TODO: this should check if the extension is actually '.torrent'.
 char *extract_filename(char *path)
 {
 	if(path == NULL || strlen(path) == 0)

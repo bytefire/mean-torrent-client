@@ -144,4 +144,17 @@ char *util_concatenate(char *str1, char *str2)
 	return combined;
 }
 
+int util_copy_file(char *src_path, char *dest_path)
+{
+	// open source file (src)  using fopen(src_path, "r")
+	// open destination file (dest) using fopen(dest_path, "w")
+	// create a buffer (buf) of length 512 bytes
+	// while fread(buf, 1, 512, src) returns a positive number,
+	// 	fwrite(buf, 1, len_read, dest) <--- this will need to go in a loop to ensure all bytes are written
+	// close src
+	// close dest
+
+	return 0;
+}
+
 #endif // UTIL_H
