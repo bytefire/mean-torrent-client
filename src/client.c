@@ -43,6 +43,11 @@ int main(int argc, char *argv[])
 {
 	char *torrent_filename = NULL;
 	char *filename = NULL;
+	char *announce_filename = NULL;
+	char *metadata_filename = NULL;
+	char *resume_filename = NULL;
+	char *saved_filename = NULL;
+
 	struct stat s;
 
 	if(argc < 2 || argc > 3) 
@@ -94,13 +99,42 @@ int main(int argc, char *argv[])
 	// check if the folder contains torrent file (i.e. filename+".torrent")
 	if(stat(torrent_filename, &s) == -1)
 	{
-		// TODO:  copy the torrent file into this folder
-			// src: path_to_torrent; dest: torrent_filename	
+		// copy the torrent file into this folder
+		// src: path_to_torrent; dest: torrent_filename	
+		if(util_copy_file(path_to_torrent, torrent_filename) < 0)
+		{
+			bf_logger("[ERROR] client.main(): Failed to copy the torrent file into the data folder.\n");
+			goto cleanup;
+		}
 	}
+
+	announce_filename = util_concatenate(filename, ".announce");
+	metadata_filename = util_concatenate(filename, ".metadata");
+	resume_filename = util_concatenate(filename, ".resume");
+	saved_filename = util_concatenate(filename, ".saved");
 
 	if(mode == MODE_NEW)
 	{
-		// TODO: delete announce file, metadata file, resume file and savedfile file
+		// if mode is MODE_NEW then delete announce file, metadata file, resume file and savedfile file
+		if(stat(announce_filename, &s) == 0)
+        	{
+			// TODO: remove announce_filename
+		}
+
+		if(stat(metadata_filename, &s) == 0)
+                {
+                        // TODO: remove metadata_filename
+                }
+
+		if(stat(resume_filename, &s) == 0)
+                {
+                        // TODO: remove resume_filename
+                }
+
+		if(stat(saved_filename, &s) == 0)
+                {
+                        // TODO: remove saved_filename
+                }
 	}
 
 	if((!/* TODO: announce file doesn't exist*/) || (mode == MODE_FRESH))
@@ -122,7 +156,7 @@ int main(int argc, char *argv[])
 	// TODO: call pwp_start
 
 
-
+/*---------------------------------------------------------------------------------------------------*/
 	int rv;
 	char *request_url;
 	char *peer_id_hex = PEER_ID_HEX;	
@@ -172,6 +206,24 @@ cleanup:
 	{
 		free(torrent_filename);
 	}
+	if(announce_filename)
+	{
+		free(announce_filename);
+	}
+	if(metadata_filename)
+	{
+		free(metadata_filename);
+	}
+	if(resume_filename)
+	{
+		free(resume_filename);
+	}
+	if(saved_filename)
+	{
+		free(saved_filename);
+	}
+
+
 /************************************************************************************************/
 	metafile_free(&mi);
         free(hash);
