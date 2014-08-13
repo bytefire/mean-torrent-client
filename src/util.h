@@ -162,7 +162,7 @@ int util_copy_file(char *src_path, char *dest_path)
 		goto cleanup;
         }
 	// open destination file (dest) using fopen(dest_path, "w")
-	if((src =fopen(dest_path, "w")) == 0)
+	if((dest =fopen(dest_path, "w")) == 0)
         {
                 fprintf(stderr, "[ERROR] util_copy_file(): Failed to open destination file %s.\n", dest_path);
                 rv = -1;
