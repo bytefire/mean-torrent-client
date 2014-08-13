@@ -39,8 +39,6 @@ char *make_tracker_http_request(char *request);
 
 void write_to_file(char *str);
 
-char *extract_filename(char *torrent_path);
-
 int main(int argc, char *argv[])
 {
 	char *torrent_filename = NULL;
@@ -73,7 +71,7 @@ int main(int argc, char *argv[])
 		}
 	}	
 	// TODO: implement following method.
-	filename = extract_filename(path_to_torrent);
+	filename = util_extract_filename(path_to_torrent);
 	// check if folder with the same name as filename exists. if not then create one.
 	if(stat(filename, &s) == -1)
 	{
@@ -185,46 +183,6 @@ cleanup:
 		free(our_peer_id);
 	}
 	return rv;
-}
-
-// TODO: could this go into utils.h?
-// TODO: this should check if the extension is actually '.torrent'.
-char *extract_filename(char *path)
-{
-	if(path == NULL || strlen(path) == 0)
-	{
-		bf_log("[ERROR] extract_filename(): 'path' is either null or empty.\n");
-                return NULL;
-	}
-	char *last_dot = strrchr(path, '.');
-	if(last_dot == NULL)
-	{
-		bf_log("[ERROR] extract_filename(): 'path' doesn't contain a dot.\n");
-		return NULL;
-	}
-	
-	char *first_char = strrchar(path, '/');
-	if(first_char == NULL)
-	{
-		first_char = path;
-	}
-	else
-	{
-		first_char = first_char + 1;
-	}
-
-	if(first_char >= last_dot)
-	{
-		bf_log("[ERROR] extract_filename(): Last dot occurs before the first character of file name.\n");
-		return NULL;
-	}
-
-	int len = last_dot - first_char + 1;
-	char *filename = (char *)malloc(len);
-	memcpy(filename, first_char, len-1);
-	filename[len-1] = '\0';
-
-	return filename;
 }
 
 // TODO: this method is a candidate for util.h

@@ -191,4 +191,42 @@ cleanup:
 	return rv;
 }
 
+char *util_extract_filename(char *path)
+{
+        if(path == NULL || strlen(path) == 0)
+        {
+                printf("[ERROR] extract_filename(): 'path' is either null or empty.\n");
+                return NULL;
+        }
+        char *last_dot = strrchr(path, '.');
+        if(last_dot == NULL)
+        {
+                printf("[ERROR] extract_filename(): 'path' doesn't contain a dot.\n");
+                return NULL;
+        }
+
+        char *first_char = strrchr(path, '/');
+        if(first_char == NULL)
+        {
+                first_char = path;
+        }
+        else
+        {
+                first_char = first_char + 1;
+        }
+
+        if(first_char >= last_dot)
+        {
+                printf("[ERROR] extract_filename(): Last dot occurs before the first character of file name.\n");
+                return NULL;
+        }
+
+        int len = last_dot - first_char + 1;
+        char *filename = (char *)malloc(len);
+        memcpy(filename, first_char, len-1);
+        filename[len-1] = '\0';
+
+        return filename;
+}
+
 #endif // UTIL_H
