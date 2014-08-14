@@ -118,29 +118,31 @@ int main(int argc, char *argv[])
 		// if mode is MODE_NEW then delete announce file, metadata file, resume file and savedfile file
 		if(stat(announce_filename, &s) == 0)
         	{
-			// TODO: remove announce_filename
+			remove(announce_filename);
 		}
 
 		if(stat(metadata_filename, &s) == 0)
                 {
-                        // TODO: remove metadata_filename
+                        remove(metadata_filename);
                 }
 
 		if(stat(resume_filename, &s) == 0)
                 {
-                        // TODO: remove resume_filename
+                        remove(resume_filename);
                 }
 
 		if(stat(saved_filename, &s) == 0)
                 {
-                        // TODO: remove saved_filename
+                        remove(saved_filename);
                 }
 	}
 
-	if((!/* TODO: announce file doesn't exist*/) || (mode == MODE_FRESH))
+	// if either announce file doesn't exist of mode is fresh then generate new announce AND metadata files
+	if((stat(announce_filename, &s) == -1) || (mode == MODE_FRESH))
 	{
-		// TODO: create a new announce file
-		// TODO: create a new metadata file
+		// create a new announce file
+		generate_announce_file(announce_filename);
+		// create a new metadata file
 	}
 
 	if(!/*TODO: resume file doesn't exist*/)
@@ -237,11 +239,43 @@ cleanup:
 	return rv;
 }
 
+int generate_announce_file(char *announce_filename)
+{
+	int rv = 0;
+	char hash[41];
+        struct metafile_info mi;
+	char *request_url = NULL;
+	char *tracker_response = NULL;
+	char *peer_id_hex = PEER_ID_HEX;
+
+	if(parse_metainfo_file(&mi, hash) != 0)
+        {
+                rv = -1;
+                goto cleanup;
+        }
+
+        request_url = get_first_request(mi.announce_url, hash, peer_id_hex, mi.length);
+        tracker_response = (char *)make_tracker_http_request(request_url);
+        write_to_file(tracker_response, announce_filename);
+
+cleanup:
+	if(request_url)
+	{
+		free(request_url);
+	}	
+	if(tracker_response)
+	{
+		free(tracker_response);
+	}
+
+	return rv;
+}
+
 // TODO: this method is a candidate for util.h
-void write_to_file(char *str)
+void write_to_file(char *str, const char *filename)
 {
 	FILE *fp;
-        fp = fopen(ANNOUNCE_FILE, "w");
+        fp = fopen(filename, "w");
         if(!fp)
         {
                 fprintf(stderr, "Failed to open file to write tracker's announce response.\n");
@@ -275,7 +309,7 @@ char *make_tracker_http_request(char *request)
 	return output.buffer;
 }
 
-int parse_metainfo_file(struct metafile_info *mi, char **hash)
+int parse_metainfo_file(struct metafile_info *mi, char *hash)
 {
 	uint8_t *sha1;
 	int i;
@@ -293,11 +327,11 @@ int parse_metainfo_file(struct metafile_info *mi, char **hash)
 	
 	for(i=0; i<20; i++)
         {
-                snprintf((*hash)+(2*i), 3, "%02x", sha1[i]);
+                snprintf(hash+(2*i), 3, "%02x", sha1[i]);
         }
-	(*hash)[40] = '\0';
+	hash[40] = '\0';
 
-	printf("%s\n", (*hash));
+	printf("%s\n", hash);
 	
 	free(sha1);
 	return 0;
