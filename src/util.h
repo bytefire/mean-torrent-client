@@ -40,7 +40,7 @@ int util_read_whole_file(char *filename, uint8_t **contents, int *file_len)
         return 0;
 }
 
-int util_hex_to_ba(char *hex, uint8_t **ba)
+int util_hex_to_ba(char *hex, uint8_t *ba)
 {
     int len;
     char *temp, buf[3];
@@ -59,7 +59,7 @@ int util_hex_to_ba(char *hex, uint8_t **ba)
     }
       
     temp = hex;
-    curr = *ba;
+    curr = ba;
     buf[2] = '\0';
     for(i=0; i<len; i+=2)
     {

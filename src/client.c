@@ -256,7 +256,7 @@ int generate_announce_file(char *torrent_filename, char *filename_to_generate)
 
         request_url = get_first_request(mi.announce_url, hash, peer_id_hex, mi.length);
         tracker_response = (char *)make_tracker_http_request(request_url);
-        write_to_file(tracker_response, filename_to_generate);
+        util_write_new_file(filename_to_generate, tracker_response);
 
 cleanup:
 	if(request_url)
@@ -267,8 +267,30 @@ cleanup:
 	{
 		free(tracker_response);
 	}
+	metafile_free(&mi);
 
 	return rv;
+}
+
+int generate_metadata_file(char *announce_filename)
+{
+	uint8_t *announce_data = NULL;
+	int len;
+	uint8_t *info_hash;
+	uint8_t our_peer_id[20];
+	char *peer_id_hex = PEER_ID_HEX;
+
+	if(util_read_whole_file(announce_filename, &announce_data, &len) != 0)
+        {
+		goto cleanup;
+        }
+
+        info_hash = sha1_compute(mi.info_val, mi.info_len);
+
+        util_hex_to_ba(peer_id_hex, our_peer_id);
+
+// TODO: 1. sort out arguments to this method. 2. write cleanup code.
+        peers_create_metadata(announce_data, len, info_hash, mi.pieces,  our_peer_id, mi.num_of_pieces, mi.piece_length);
 }
 
 // TODO: this method is a candidate for util.h
