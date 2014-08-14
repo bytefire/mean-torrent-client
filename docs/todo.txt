@@ -17,6 +17,7 @@
 (done) 14. add a utils.h method to append a string to another string and return a new string. used for generating metadata, resume etc filenames.
 (done) 15. add utils.h methods to create and delete files and folders (?) ---> actually done inside client.cs rather than util.h
 (done) 16. test these two methods individually: extract_filename() in client.c and util_copy_file() in util.h
+17. working on write_new_file() method in util.h. then check the methods called inside generate_announce_file() method in client.c.
 ---------------------------------
 
 long-term:

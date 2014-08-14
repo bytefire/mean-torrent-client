@@ -229,4 +229,19 @@ char *util_extract_filename(char *path)
         return filename;
 }
 
+int util_write_new_file(char *filename, char *contents)
+{
+	FILE *fp;
+        fp = fopen(filename, "w");
+        if(!fp)
+        {
+                fprintf(stderr, "[ERROR] util_write_new_file(): Failed to open or create file %s.\n", filename);
+                return -1;
+        }
+        fprintf(fp, contents);
+        fclose(fp);
+	
+	return 0;
+}
+
 #endif // UTIL_H
