@@ -33,7 +33,7 @@ static size_t write_memory_callback(void *ptr, size_t size, size_t nmemb, void *
 
 char *get_first_request(char *announce_url, char *info_hash_hex, char *peer_id_hex, long int file_size);
 
-int parse_metainfo_file(struct metafile_info *mi, char **hash);
+int parse_torrent_file(char *torrent_filename, struct metafile_info *mi, char **hash);
 
 char *make_tracker_http_request(char *request);
 
@@ -141,7 +141,7 @@ int main(int argc, char *argv[])
 	if((stat(announce_filename, &s) == -1) || (mode == MODE_FRESH))
 	{
 		// create a new announce file
-		generate_announce_file(announce_filename);
+		generate_announce_file(torrent_filename, announce_filename);
 		// create a new metadata file
 	}
 
@@ -239,7 +239,7 @@ cleanup:
 	return rv;
 }
 
-int generate_announce_file(char *announce_filename)
+int generate_announce_file(char *torrent_filename, char *filename_to_generate)
 {
 	int rv = 0;
 	char hash[41];
@@ -248,7 +248,7 @@ int generate_announce_file(char *announce_filename)
 	char *tracker_response = NULL;
 	char *peer_id_hex = PEER_ID_HEX;
 
-	if(parse_metainfo_file(&mi, hash) != 0)
+	if(parse_torrent_file(torrent_filename, &mi, hash) != 0)
         {
                 rv = -1;
                 goto cleanup;
@@ -256,7 +256,7 @@ int generate_announce_file(char *announce_filename)
 
         request_url = get_first_request(mi.announce_url, hash, peer_id_hex, mi.length);
         tracker_response = (char *)make_tracker_http_request(request_url);
-        write_to_file(tracker_response, announce_filename);
+        write_to_file(tracker_response, filename_to_generate);
 
 cleanup:
 	if(request_url)
@@ -309,14 +309,14 @@ char *make_tracker_http_request(char *request)
 	return output.buffer;
 }
 
-int parse_metainfo_file(struct metafile_info *mi, char *hash)
+int parse_torrent_file(char *torrent_filename, struct metafile_info *mi, char *hash)
 {
 	uint8_t *sha1;
 	int i;
 
-	if(read_metafile(FILE_NAME, mi) != 0)
+	if(read_metafile(torrent_filename, mi) != 0)
         {
-                fprintf(stderr, "Error reading metainfo file.\n");
+                bf_log("[ERROR] parse_torrent_file(): Error reading torrent file when calling read_metafile().\n");
                 return -1;
         }
         printf("Metafile Info:\n");
