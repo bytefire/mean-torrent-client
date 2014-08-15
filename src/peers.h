@@ -5,7 +5,7 @@
 
 #include "bencode.h"
 
-#define METADATA_FILE "../files/loff.metadata"
+// #define METADATA_FILE "../files/loff.metadata"
 
 struct peer
 {
@@ -120,14 +120,14 @@ Whole file is one bencoded dictionary with following keys.
 	a. ip
 	b. port
 */
-void peers_create_metadata(char *announce, int len, uint8_t *info_hash, uint8_t *piece_hashes, uint8_t *our_peer_id, long int num_of_pieces, long int piece_length)
+void peers_create_metadata(char *announce, int len, uint8_t *info_hash, uint8_t *piece_hashes, uint8_t *our_peer_id, long int num_of_pieces, long int piece_length, const char *metadata_filename)
 {
 	struct peer *head, *curr;
 	FILE *fp;
 	char buf[30];
 	int piece_hashes_len = num_of_pieces * 20; // where 20 is length of sha1 hash
 
-	fp = fopen(METADATA_FILE, "w");
+	fp = fopen(metadata_filename, "w");
 	
 	fprintf(fp, "d");
 

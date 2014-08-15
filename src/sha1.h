@@ -152,6 +152,8 @@ uint8_t *sha1_compute(uint8_t *msg, int msg_len)
 	// pad msg
 	int pad_len, i;
 	uint8_t *padded;
+
+// TODO: instead of allocating the 20 bytes, this method should taken in a pre-allocated 20-byte array and just populate it.
 	uint8_t *sha1 = malloc(20);
 	uint8_t *temp;
 

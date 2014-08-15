@@ -143,6 +143,7 @@ int main(int argc, char *argv[])
 		// create a new announce file
 		generate_announce_file(torrent_filename, announce_filename);
 		// create a new metadata file
+		generate_metadata_file(announce_filename, metadata_filename);
 	}
 
 	if(!/*TODO: resume file doesn't exist*/)
@@ -272,39 +273,42 @@ cleanup:
 	return rv;
 }
 
-int generate_metadata_file(char *announce_filename)
+int generate_metadata_file(char *announce_filename, char *filename_to_generate)
 {
+	int rv = 0;
 	uint8_t *announce_data = NULL;
 	int len;
-	uint8_t *info_hash;
+	uint8_t *info_hash = NULL;
 	uint8_t our_peer_id[20];
 	char *peer_id_hex = PEER_ID_HEX;
 
 	if(util_read_whole_file(announce_filename, &announce_data, &len) != 0)
         {
+		bf_logger("[ERROR] generate_metadata_file(): Failed to read announce file.\n");
+		rv = -1;
 		goto cleanup;
         }
-
+	// TODO: sha1_compute() should take in a 20-byte array rather than malloc a new one every time!
+	//	that way the caller can decide whether it wants to allocate the 20 bytes on stack or heap.
         info_hash = sha1_compute(mi.info_val, mi.info_len);
+        if(util_hex_to_ba(peer_id_hex, our_peer_id) != 0)
+	{
+		bg_logger("[ERROR] generate_metadata_file(): Failed during call to util_hex_to_ba().\n");
+		rv = -1;
+		goto cleanup;
+	}
+        peers_create_metadata(announce_data, len, info_hash, mi.pieces,  our_peer_id, mi.num_of_pieces, mi.piece_length, filename_to_generate);
+cleanup:
+	if(announce_data)
+	{
+		free(announce_data);
+	}
+	if(info_hash)
+	{
+		free(info_hash);
+	}
 
-        util_hex_to_ba(peer_id_hex, our_peer_id);
-
-// TODO: 1. sort out arguments to this method. 2. write cleanup code.
-        peers_create_metadata(announce_data, len, info_hash, mi.pieces,  our_peer_id, mi.num_of_pieces, mi.piece_length);
-}
-
-// TODO: this method is a candidate for util.h
-void write_to_file(char *str, const char *filename)
-{
-	FILE *fp;
-        fp = fopen(filename, "w");
-        if(!fp)
-        {
-                fprintf(stderr, "Failed to open file to write tracker's announce response.\n");
-                return;
-        }
-        fprintf(fp, str);
-        fclose(fp);
+	return rv;
 }
 
 void print_peers(char *announce)
