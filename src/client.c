@@ -30,14 +30,11 @@ struct buffer_struct
 };
 
 static size_t write_memory_callback(void *ptr, size_t size, size_t nmemb, void *data);
-
 char *get_first_request(char *announce_url, char *info_hash_hex, char *peer_id_hex, long int file_size);
-
 int parse_torrent_file(char *torrent_filename, struct metafile_info *mi, char **hash);
-
 char *make_tracker_http_request(char *request);
-
-void write_to_file(char *str);
+int generate_announce_file(char *torrent_filename, char *filename_to_generate);
+int generate_metadata_file(char *announce_filename, char *filename_to_generate);
 
 int main(int argc, char *argv[])
 {
@@ -156,10 +153,18 @@ int main(int argc, char *argv[])
 		// TODO: create savedfile
 	}
 
-	// TODO: call pwp_start
-
+	// call pwp_start
+	 if(pwp_start(metadata_filename) != 0)
+        {
+                bf_logger("[ERROR] client.main(): There was a problem communicating with remote peer.\n");
+        }
+        else
+        {
+                bf_logger("{LOG] client.main(): Performed pwp comm. successfully.\n");
+        }
 
 /*---------------------------------------------------------------------------------------------------*/
+/*
 	int rv;
 	char *request_url;
 	char *peer_id_hex = PEER_ID_HEX;	
@@ -199,6 +204,7 @@ int main(int argc, char *argv[])
 	// handshake = compose_handshake(info_hash, our_peer_id, &hs_len);
 	
 	printf("LibCurl rules.\n");
+*/
 
 cleanup:
 	if(filename)
@@ -228,6 +234,7 @@ cleanup:
 
 
 /************************************************************************************************/
+/*
 	metafile_free(&mi);
         free(hash);
 	free(request_url);
@@ -237,6 +244,7 @@ cleanup:
 	{
 		free(our_peer_id);
 	}
+*/
 	return rv;
 }
 
@@ -311,11 +319,6 @@ cleanup:
 	return rv;
 }
 
-void print_peers(char *announce)
-{
-	
-}
-
 char *make_tracker_http_request(char *request)
 {
 	curl_global_init(CURL_GLOBAL_ALL);
@@ -342,7 +345,7 @@ int parse_torrent_file(char *torrent_filename, struct metafile_info *mi, char *h
 
 	if(read_metafile(torrent_filename, mi) != 0)
         {
-                bf_log("[ERROR] parse_torrent_file(): Error reading torrent file when calling read_metafile().\n");
+                bf_logger("[ERROR] parse_torrent_file(): Error reading torrent file when calling read_metafile().\n");
                 return -1;
         }
         printf("Metafile Info:\n");
