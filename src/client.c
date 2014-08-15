@@ -31,10 +31,10 @@ struct buffer_struct
 
 static size_t write_memory_callback(void *ptr, size_t size, size_t nmemb, void *data);
 char *get_first_request(char *announce_url, char *info_hash_hex, char *peer_id_hex, long int file_size);
-int parse_torrent_file(char *torrent_filename, struct metafile_info *mi, char **hash);
+int parse_torrent_file(char *torrent_filename, struct metafile_info *mi, char *hash);
 char *make_tracker_http_request(char *request);
-int generate_announce_file(char *torrent_filename, char *filename_to_generate);
-int generate_metadata_file(char *announce_filename, char *filename_to_generate);
+int generate_announce_file(struct metafile_info *mi, char *hash, char *filename_to_generate);
+int generate_metadata_file(char *announce_filename, struct metafile_info *mi, char *filename_to_generate);
 
 int main(int argc, char *argv[])
 {
@@ -44,8 +44,10 @@ int main(int argc, char *argv[])
 	char *metadata_filename = NULL;
 	char *resume_filename = NULL;
 	char *saved_filename = NULL;
-
+	char hash[41];
+	struct metafile_info mi;
 	struct stat s;
+	int rv = 0;
 
 	if(argc < 2 || argc > 3) 
 	{
@@ -80,7 +82,8 @@ int main(int argc, char *argv[])
 		// create the folder
 		if(mkdir(filename, 0700) != 0)
 		{
-			bf_logger("[ERROR] client.main(): There was an error creating directory %s: %s\n", filename, perror(NULL));
+			bf_log("[ERROR] client.main(): There was an error creating directory %s.\n", filename);
+			perror(NULL);
 			goto cleanup;
 		}
 	}
@@ -88,7 +91,8 @@ int main(int argc, char *argv[])
 	// move into that directory
 	if(chdir(filename) == -1)
 	{
-		bf_logger("[ERROR] client.main(): Problem changing to directory %s: %s\n", filename, perror(NULL));
+		bf_log("[ERROR] client.main(): Problem changing to directory %s.\n", filename);
+		perror(NULL);
 		goto cleanup;
 	}
 	
@@ -100,7 +104,7 @@ int main(int argc, char *argv[])
 		// src: path_to_torrent; dest: torrent_filename	
 		if(util_copy_file(path_to_torrent, torrent_filename) < 0)
 		{
-			bf_logger("[ERROR] client.main(): Failed to copy the torrent file into the data folder.\n");
+			bf_log("[ERROR] client.main(): Failed to copy the torrent file into the data folder.\n");
 			goto cleanup;
 		}
 	}
@@ -137,30 +141,36 @@ int main(int argc, char *argv[])
 	// if either announce file doesn't exist of mode is fresh then generate new announce AND metadata files
 	if((stat(announce_filename, &s) == -1) || (mode == MODE_FRESH))
 	{
+		if(parse_torrent_file(torrent_filename, &mi, hash) != 0)
+	        {
+                	rv = -1;
+        	        goto cleanup;
+	        }
 		// create a new announce file
-		generate_announce_file(torrent_filename, announce_filename);
+		generate_announce_file(&mi, hash, announce_filename);
 		// create a new metadata file
-		generate_metadata_file(announce_filename, metadata_filename);
+		generate_metadata_file(announce_filename, &mi, metadata_filename);
 	}
 
-	if(!/*TODO: resume file doesn't exist*/)
+/*
+	if(!//TODO: resume file doesn't exist)
 	{
 		// TODO: create a resume file
 	}
 
-	if(!/*TODO: savedfile doesn't exists*/)
+	if(!//TODO: savedfile doesn't exists)
 	{
 		// TODO: create savedfile
 	}
 
-	// call pwp_start
+*/	// call pwp_start
 	 if(pwp_start(metadata_filename) != 0)
         {
-                bf_logger("[ERROR] client.main(): There was a problem communicating with remote peer.\n");
+                bf_log("[ERROR] client.main(): There was a problem communicating with remote peer.\n");
         }
         else
         {
-                bf_logger("{LOG] client.main(): Performed pwp comm. successfully.\n");
+                bf_log("{LOG] client.main(): Performed pwp comm. successfully.\n");
         }
 
 /*---------------------------------------------------------------------------------------------------*/
@@ -231,7 +241,7 @@ cleanup:
 	{
 		free(saved_filename);
 	}
-
+	metafile_free(&mi);
 
 /************************************************************************************************/
 /*
@@ -248,22 +258,24 @@ cleanup:
 	return rv;
 }
 
-int generate_announce_file(char *torrent_filename, char *filename_to_generate)
+int generate_announce_file(struct metafile_info *mi, char *hash, char *filename_to_generate)
 {
 	int rv = 0;
-	char hash[41];
-        struct metafile_info mi;
+	//char hash[41];
+        //struct metafile_info mi;
 	char *request_url = NULL;
 	char *tracker_response = NULL;
 	char *peer_id_hex = PEER_ID_HEX;
 
+/*
 	if(parse_torrent_file(torrent_filename, &mi, hash) != 0)
         {
                 rv = -1;
                 goto cleanup;
         }
+*/
 
-        request_url = get_first_request(mi.announce_url, hash, peer_id_hex, mi.length);
+        request_url = get_first_request(mi->announce_url, hash, peer_id_hex, mi->length);
         tracker_response = (char *)make_tracker_http_request(request_url);
         util_write_new_file(filename_to_generate, tracker_response);
 
@@ -276,12 +288,11 @@ cleanup:
 	{
 		free(tracker_response);
 	}
-	metafile_free(&mi);
 
 	return rv;
 }
 
-int generate_metadata_file(char *announce_filename, char *filename_to_generate)
+int generate_metadata_file(char *announce_filename, struct metafile_info *mi, char *filename_to_generate)
 {
 	int rv = 0;
 	uint8_t *announce_data = NULL;
@@ -292,20 +303,20 @@ int generate_metadata_file(char *announce_filename, char *filename_to_generate)
 
 	if(util_read_whole_file(announce_filename, &announce_data, &len) != 0)
         {
-		bf_logger("[ERROR] generate_metadata_file(): Failed to read announce file.\n");
+		bf_log("[ERROR] generate_metadata_file(): Failed to read announce file.\n");
 		rv = -1;
 		goto cleanup;
         }
 	// TODO: sha1_compute() should take in a 20-byte array rather than malloc a new one every time!
 	//	that way the caller can decide whether it wants to allocate the 20 bytes on stack or heap.
-        info_hash = sha1_compute(mi.info_val, mi.info_len);
+        info_hash = sha1_compute(mi->info_val, mi->info_len);
         if(util_hex_to_ba(peer_id_hex, our_peer_id) != 0)
 	{
-		bg_logger("[ERROR] generate_metadata_file(): Failed during call to util_hex_to_ba().\n");
+		bf_log("[ERROR] generate_metadata_file(): Failed during call to util_hex_to_ba().\n");
 		rv = -1;
 		goto cleanup;
 	}
-        peers_create_metadata(announce_data, len, info_hash, mi.pieces,  our_peer_id, mi.num_of_pieces, mi.piece_length, filename_to_generate);
+        peers_create_metadata(announce_data, len, info_hash, mi->pieces,  our_peer_id, mi->num_of_pieces, mi->piece_length, filename_to_generate);
 cleanup:
 	if(announce_data)
 	{
@@ -345,7 +356,7 @@ int parse_torrent_file(char *torrent_filename, struct metafile_info *mi, char *h
 
 	if(read_metafile(torrent_filename, mi) != 0)
         {
-                bf_logger("[ERROR] parse_torrent_file(): Error reading torrent file when calling read_metafile().\n");
+                bf_log("[ERROR] parse_torrent_file(): Error reading torrent file when calling read_metafile().\n");
                 return -1;
         }
         printf("Metafile Info:\n");
