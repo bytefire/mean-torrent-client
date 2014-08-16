@@ -152,6 +152,13 @@ int main(int argc, char *argv[])
 		generate_announce_file(&mi, hash, announce_filename);
 		// create a new metadata file
 		generate_metadata_file(announce_filename, &mi, metadata_filename);
+		// create a new saved file
+		if(util_create_file_of_size(saved_filename, mi.num_of_pieces * mi.piece_length) != 0)
+	        {
+        	        bf_log("[ERROR] client.main(): Failed to create saved file. Aborting.\n");
+                	rv = -1;
+	                goto cleanup;
+        	}	
 	}
 
 /*
@@ -159,20 +166,23 @@ int main(int argc, char *argv[])
 	{
 		// TODO: create a resume file
 	}
-
-	if(!//TODO: savedfile doesn't exists)
+*/
+	// if saved file doesn't exist then report error and abort
+	if(stat(saved_filename, &s) == -1)
 	{
-		// TODO: create savedfile
+		bf_log("[ERROR] client.main(): Saved file should exist by now but it doesn't. Aborting.\n");
+		rv = -1;
+		goto cleanup;
 	}
 
-*/	// call pwp_start
-	 if(pwp_start(metadata_filename) != 0)
+	// call pwp_start
+	 if(pwp_start(metadata_filename, saved_filename) != 0)
         {
                 bf_log("[ERROR] client.main(): There was a problem communicating with remote peer.\n");
         }
         else
         {
-                bf_log("{LOG] client.main(): Performed pwp comm. successfully.\n");
+                bf_log("[LOG] client.main(): Performed pwp comm. successfully.\n");
         }
 
 cleanup:

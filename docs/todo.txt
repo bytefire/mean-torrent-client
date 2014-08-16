@@ -32,3 +32,4 @@ long-term:
 
 1. connect client to pwp_start
 2. ability to resume download
+3. remove warnings
