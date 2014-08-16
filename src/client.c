@@ -175,49 +175,6 @@ int main(int argc, char *argv[])
                 bf_log("{LOG] client.main(): Performed pwp comm. successfully.\n");
         }
 
-/*---------------------------------------------------------------------------------------------------*/
-/*
-	int rv;
-	char *request_url;
-	char *peer_id_hex = PEER_ID_HEX;	
-	char *hash = malloc(41);
-        struct metafile_info mi;
-	uint8_t *info_hash;
-	uint8_t *handshake;
-	uint8_t *our_peer_id;
-	int hs_len, len;	
-	
-	char *tracker_response;
-
-	rv=0;
-
-	if(parse_metainfo_file(&mi, &hash) != 0)
-	{
-		rv = -1;
-		goto cleanup;
-	}	
-
-	request_url = get_first_request(mi.announce_url, hash, peer_id_hex, mi.length);
-	tracker_response = (char *)make_tracker_http_request(request_url);
-	write_to_file(tracker_response);
-	
-	if(util_read_whole_file(ANNOUNCE_FILE, (uint8_t **)(&tracker_response), &len) != 0)
-	{
-			goto cleanup;
-	}
-	
-	info_hash = sha1_compute(mi.info_val, mi.info_len);
-	
-	our_peer_id = malloc(20);
-	util_hex_to_ba(peer_id_hex, &our_peer_id);
-	peers_create_metadata(tracker_response, len, info_hash, mi.pieces,  our_peer_id, mi.num_of_pieces, mi.piece_length);
-
-	// for testing only:
-	// handshake = compose_handshake(info_hash, our_peer_id, &hs_len);
-	
-	printf("LibCurl rules.\n");
-*/
-
 cleanup:
 	if(filename)
 	{
@@ -245,18 +202,6 @@ cleanup:
 	}
 	metafile_free(&mi);
 
-/************************************************************************************************/
-/*
-	metafile_free(&mi);
-        free(hash);
-	free(request_url);
-	free(tracker_response);
-	free(info_hash);
-	if(our_peer_id)
-	{
-		free(our_peer_id);
-	}
-*/
 	bf_logger_end();
 
 	return rv;
@@ -265,19 +210,9 @@ cleanup:
 int generate_announce_file(struct metafile_info *mi, char *hash, char *filename_to_generate)
 {
 	int rv = 0;
-	//char hash[41];
-        //struct metafile_info mi;
 	char *request_url = NULL;
 	char *tracker_response = NULL;
 	char *peer_id_hex = PEER_ID_HEX;
-
-/*
-	if(parse_torrent_file(torrent_filename, &mi, hash) != 0)
-        {
-                rv = -1;
-                goto cleanup;
-        }
-*/
 
         request_url = get_first_request(mi->announce_url, hash, peer_id_hex, mi->length);
         tracker_response = (char *)make_tracker_http_request(request_url);

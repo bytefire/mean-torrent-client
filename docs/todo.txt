@@ -21,7 +21,7 @@
 18. in sha1_compute() method, instead of allocating a 20 bytes for sha1 hash, this method should take in pre-allocated 20-byte array and just populate it.
 ---------------------------------
 
-> call pwp_start inside main of client, compile and test it end-to-end.
+(done) > call pwp_start inside main of client, compile and test it end-to-end.
 > clean up client.c
 > move creation of saved file from pwp_start to main of client.
 > create resume file inside main and use it to initialise g_pieces array inside pwp.
