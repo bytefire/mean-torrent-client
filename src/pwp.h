@@ -46,7 +46,7 @@
 
 #define BLOCK_REQUESTS_COUNT 3 // max no of requests sent every time
 
-#define SAVED_FILE_PATH "../../files/loff.savedfile"
+#define SAVED_FILE_PATH "loff.savedfile"
 // #define LOG_FILE "logs/pwp.log"
 #define MAX_THREADS 4
 #define PIECES_TO_DOWNLOAD 3
