@@ -10,13 +10,10 @@
 #include "pwp.h"
 #include "util.h"
 
-#define FILE_NAME "/home/bytefire/dev/code/bit-torrent-client/files/loff.torrent"
-//#define FILE_NAME "~/dev/code/bit-torrent-client/files/dbc.torrent"
-#define ANNOUNCE_FILE "/home/bytefire/dev/code/bit-torrent-client/files/loff.announce"
 #define PEER_ID_HEX "dd0e76bcc7f711e3af893c77e686ca85b8f12e24";
 /*********************************************************************/
 
-
+#define LOG_FILE "logs/client.log"
 #define USAGE_MESSAGE "Usage: client <path-to-torrent-file> {fresh|new}\n"
 
 #define MODE_DEFAULT 0
@@ -48,6 +45,8 @@ int main(int argc, char *argv[])
 	struct metafile_info mi;
 	struct stat s;
 	int rv = 0;
+
+	bf_logger_init(LOG_FILE);
 
 	if(argc < 2 || argc > 3) 
 	{
@@ -101,12 +100,15 @@ int main(int argc, char *argv[])
 	if(stat(torrent_filename, &s) == -1)
 	{
 		// copy the torrent file into this folder
-		// src: path_to_torrent; dest: torrent_filename	
-		if(util_copy_file(path_to_torrent, torrent_filename) < 0)
+		// src: path_to_torrent; dest: torrent_filename
+		char *relative_path = util_concatenate("../", path_to_torrent);	
+		if(util_copy_file(relative_path, torrent_filename) < 0)
 		{
 			bf_log("[ERROR] client.main(): Failed to copy the torrent file into the data folder.\n");
+			free(relative_path);
 			goto cleanup;
 		}
+		free(relative_path);
 	}
 
 	announce_filename = util_concatenate(filename, ".announce");
@@ -255,6 +257,8 @@ cleanup:
 		free(our_peer_id);
 	}
 */
+	bf_logger_end();
+
 	return rv;
 }
 

@@ -47,7 +47,7 @@
 #define BLOCK_REQUESTS_COUNT 3 // max no of requests sent every time
 
 #define SAVED_FILE_PATH "../../files/loff.savedfile"
-#define LOG_FILE "logs/pwp.log"
+// #define LOG_FILE "logs/pwp.log"
 #define MAX_THREADS 4
 #define PIECES_TO_DOWNLOAD 3
 
@@ -129,8 +129,9 @@ int download_block(int socketfd, int expected_piece_idx, FILE *savedfp, struct p
 
 int pwp_start(char *md_file)
 {
-	bf_logger_init(LOG_FILE);
-bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
+//	bf_logger_init(LOG_FILE);
+
+	bf_log("++++++++++++++++++++ START:  PWP_START +++++++++++++++++++++++\n");
 
 	uint8_t *metadata;
 	const char *str;
@@ -358,7 +359,7 @@ cleanup:
                 free(g_piece_hashes);
         }
 	
-	bf_logger_end();
+//	bf_logger_end();
 	return rv;	
 }
 

@@ -158,14 +158,16 @@ int util_copy_file(char *src_path, char *dest_path)
 	if((src =fopen(src_path, "r")) == 0)
         {
                 fprintf(stderr, "[ERROR] util_copy_file(): Failed to open source file %s.\n", src_path);
-                rv = -1;
+                perror(NULL);
+		rv = -1;
 		goto cleanup;
         }
 	// open destination file (dest) using fopen(dest_path, "w")
 	if((dest =fopen(dest_path, "w")) == 0)
         {
                 fprintf(stderr, "[ERROR] util_copy_file(): Failed to open destination file %s.\n", dest_path);
-                rv = -1;
+                perror(NULL);
+		rv = -1;
                 goto cleanup;
         }
 	// create a buffer (buf) of length 512 bytes
