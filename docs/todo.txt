@@ -22,9 +22,10 @@
 ---------------------------------
 
 (done) > call pwp_start inside main of client, compile and test it end-to-end.
-> clean up client.c
-> move creation of saved file from pwp_start to main of client.
+(done) > clean up client.c
+(done) > move creation of saved file from pwp_start to main of client.
 > create resume file inside main and use it to initialise g_pieces array inside pwp.
+> pwp.h to update the resume file.
 
 
 long-term:

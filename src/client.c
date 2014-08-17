@@ -45,6 +45,7 @@ int main(int argc, char *argv[])
 	struct metafile_info mi;
 	struct stat s;
 	int rv = 0;
+	int torrent_already_present = 1;
 
 	bf_logger_init(LOG_FILE);
 
@@ -99,6 +100,7 @@ int main(int argc, char *argv[])
 	// check if the folder contains torrent file (i.e. filename+".torrent")
 	if(stat(torrent_filename, &s) == -1)
 	{
+		torrent_already_present = 0;
 		// copy the torrent file into this folder
 		// src: path_to_torrent; dest: torrent_filename
 		char *relative_path = util_concatenate("../", path_to_torrent);	
@@ -116,7 +118,8 @@ int main(int argc, char *argv[])
 	resume_filename = util_concatenate(filename, ".resume");
 	saved_filename = util_concatenate(filename, ".saved");
 
-	if(mode == MODE_NEW)
+	// if torrent isn't already present we assume that it is a DIFFERENT torrent.
+	if((mode == MODE_NEW) || (!torrent_already_present))
 	{
 		// if mode is MODE_NEW then delete announce file, metadata file, resume file and savedfile file
 		if(stat(announce_filename, &s) == 0)
@@ -140,33 +143,36 @@ int main(int argc, char *argv[])
                 }
 	}
 
-	// if either announce file doesn't exist of mode is fresh then generate new announce AND metadata files
-	if((stat(announce_filename, &s) == -1) || (mode == MODE_FRESH))
-	{
-		if(parse_torrent_file(torrent_filename, &mi, hash) != 0)
-	        {
-                	rv = -1;
-        	        goto cleanup;
-	        }
+
+	if(parse_torrent_file(torrent_filename, &mi, hash) != 0)
+        {
+               	rv = -1;
+       	        goto cleanup;
+        }
+
+	// if either metadata file doesn't exist of mode is fresh then generate new announce AND metadata files
+        if((stat(metadata_filename, &s) == -1) || (mode == MODE_FRESH))
+        {
 		// create a new announce file
 		generate_announce_file(&mi, hash, announce_filename);
 		// create a new metadata file
-		generate_metadata_file(announce_filename, &mi, metadata_filename);
-		// create a new saved file
-		if(util_create_file_of_size(saved_filename, mi.num_of_pieces * mi.piece_length) != 0)
-	        {
-        	        bf_log("[ERROR] client.main(): Failed to create saved file. Aborting.\n");
-                	rv = -1;
-	                goto cleanup;
-        	}	
+		generate_metadata_file(announce_filename, &mi, metadata_filename);	
 	}
 
-/*
-	if(!//TODO: resume file doesn't exist)
+	// if saved file doesn't already exist then create a new one along with new resume file.
+	// NOTE that whenever we create a new saved file we must also create a new resume file.
+	if(stat(saved_filename, &s) == -1)
 	{
-		// TODO: create a resume file
+	        if(util_create_file_of_size(saved_filename, mi.num_of_pieces * mi.piece_length) != 0)
+        	{
+                	bf_log("[ERROR] client.main(): Failed to create saved file. Aborting.\n");
+	                rv = -1;
+        	        goto cleanup;
+        	}
+		// TODO: create a resume file which is just a bit string containing one (unset) bit for every piece.
+ 
 	}
-*/
+
 	// if saved file doesn't exist then report error and abort
 	if(stat(saved_filename, &s) == -1)
 	{
