@@ -234,9 +234,33 @@ void metafile_print(struct metafile_info *mi)
 
 void metafile_free(struct metafile_info *mi)
 {
-	free(mi->announce_url);
-	free(mi->file_name);
-	free(mi->top_most_directory);
-	free(mi->pieces);
-	free(mi->info_val);
+	if(mi->announce_url)
+	{
+		free(mi->announce_url);
+		mi->announce_url = NULL;
+	}
+
+	if(mi->file_name)
+	{
+		free(mi->file_name);
+		mi->file_name = NULL;
+	}
+
+	if(mi->top_most_directory)
+	{
+		free(mi->top_most_directory);
+		mi->top_most_directory = NULL;
+	}
+
+	if(mi->pieces)
+	{
+		free(mi->pieces);
+		mi->pieces = NULL;
+	}
+
+	if(mi->info_val)
+	{
+		free(mi->info_val);
+		mi->info_val = NULL;
+	}
 }

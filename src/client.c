@@ -32,6 +32,7 @@ int parse_torrent_file(char *torrent_filename, struct metafile_info *mi, char *h
 char *make_tracker_http_request(char *request);
 int generate_announce_file(struct metafile_info *mi, char *hash, char *filename_to_generate);
 int generate_metadata_file(char *announce_filename, struct metafile_info *mi, char *filename_to_generate);
+int create_resume_file(const char *filename, int num_of_pieces);
 
 int main(int argc, char *argv[])
 {
@@ -169,8 +170,13 @@ int main(int argc, char *argv[])
 	                rv = -1;
         	        goto cleanup;
         	}
-		// TODO: create a resume file which is just a bit string containing one (unset) bit for every piece.
- 
+		// create a resume file which is just a bit string containing one (unset) bit for every piece.
+ 		if(create_resume_file(resume_filename, mi.num_of_pieces) != 0)
+		{
+			bf_log("[ERROR] client.main(): Failed to create resume file. Aborting.\n");
+			rv = -1;
+			goto cleanup;
+		}
 	}
 
 	// if saved file doesn't exist then report error and abort
@@ -181,8 +187,12 @@ int main(int argc, char *argv[])
 		goto cleanup;
 	}
 
+	// free mi instance as it won't be needed any further. note that this free method will be called again 
+	// under cleanup label but that doesn't matter as metafile_free() is idempotent.
+	metafile_free(&mi);
+
 	// call pwp_start
-	 if(pwp_start(metadata_filename, saved_filename) != 0)
+	if(pwp_start(metadata_filename, saved_filename) != 0)
         {
                 bf_log("[ERROR] client.main(): There was a problem communicating with remote peer.\n");
         }
@@ -281,6 +291,23 @@ cleanup:
 	{
 		free(info_hash);
 	}
+
+	return rv;
+}
+
+int create_resume_file(const char *filename, int num_of_pieces)
+{
+	int rv = 0;
+	int size_in_bytes = num_of_pieces/8;
+	size_in_bytes += (num_of_pieces%8) ? 1: 0;
+	char *data = (char *)calloc(size_in_bytes, 1);
+	
+	if(util_write_new_file(filename, data) != 0)
+	{
+		rv = -1;
+	}
+
+	free(data);
 
 	return rv;
 }
