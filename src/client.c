@@ -192,7 +192,7 @@ int main(int argc, char *argv[])
 	metafile_free(&mi);
 
 	// call pwp_start
-	if(pwp_start(metadata_filename, saved_filename) != 0)
+	if(pwp_start(metadata_filename, saved_filename, resume_filename) != 0)
         {
                 bf_log("[ERROR] client.main(): There was a problem communicating with remote peer.\n");
         }

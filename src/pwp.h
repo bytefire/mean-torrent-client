@@ -94,7 +94,8 @@ long int g_piece_length = -1;
 long int g_num_of_pieces = -1;
 long int g_downloaded_pieces = 0;
 uint8_t *g_piece_hashes;
-char *saved_filename = NULL;
+char *g_saved_filepath = NULL;
+char *g_resume_filepath = NULL;
 
 pthread_mutex_t *g_pieces_mutexes = NULL;
 pthread_mutex_t g_downloaded_pieces_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -124,7 +125,7 @@ int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer);
 uint8_t *prepare_requests(int piece_idx, struct pwp_block *blocks, int num_of_blocks, int max_requests, int *len);
 int download_block(int socketfd, int expected_piece_idx, FILE *savedfp, struct pwp_block *block, struct pwp_peer *peer);
 
-int pwp_start(char *md_filepath, char *saved_filepath)
+int pwp_start(const char *md_filepath, const char *saved_filepath, const char *resume_filepath)
 {
 //	bf_logger_init(LOG_FILE);
 
@@ -141,7 +142,8 @@ int pwp_start(char *md_filepath, char *saved_filepath)
 	char *ip;
 	uint16_t port;
 
-	saved_filename = saved_filepath;
+	g_saved_filepath = saved_filepath;
+	g_resume_filepath = resume_filepath;
 
 	if(util_read_whole_file(md_filepath, &metadata, &len) != 0)
 	{
@@ -209,15 +211,6 @@ int pwp_start(char *md_filepath, char *saved_filepath)
         g_piece_hashes = malloc(len);
         memcpy(g_piece_hashes, str, len);
 	
-	/*
-	// create a file whose size is num_of_pieces * piece_length        
-	if(util_create_file_of_size(SAVED_FILE_PATH, g_num_of_pieces * g_piece_length) != 0)
-	{
-		bf_log(  "[ERROR] pwp_start(): Failed to create saved file. Aborting.\n");
-		rv = -1;
-		goto cleanup;
-	}
-	*/
 
 	bencode_dict_get_next(&b1, &b2, &str, &len);
         if(strncmp(str, "peers", 5) != 0)
@@ -227,6 +220,8 @@ int pwp_start(char *md_filepath, char *saved_filepath)
                 goto cleanup;
         }
 
+	// TODO: initialise g_pieces array
+	
 	struct talk_to_peer_args *args;
 	pthread_t thread1;
 	int t1_rv, thread_count;
@@ -947,7 +942,7 @@ int get_pieces(int socketfd, struct pwp_peer *peer)
 
 	int idx = choose_random_piece_idx(peer->peer_id);
 
-	savedfp = fopen(saved_filename, "r+");
+	savedfp = fopen(g_saved_filepath, "r+");
         if(!savedfp)
         {
                 bf_log("[ERROR] get_pieces(): Failed to open saved file. Aborting this thread.\n");
@@ -1094,7 +1089,7 @@ int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer)
 
 	// TODO: this can be made to use savedfp rather than openinig the file separately. Take caution that util_read_file_chunk 
 	//	then doesn't change the position of file pointer so as to write at incorrect pos when downloading next piece.	
-	if(util_read_file_chunk(saved_filename, idx *  g_piece_length, g_piece_length, piece_data) != 0)
+	if(util_read_file_chunk(g_saved_filepath, idx *  g_piece_length, g_piece_length, piece_data) != 0)
 	{
 		bf_log("[ERROR] download_piece(): Faile to read piece number %d from file, therefore unable to verify SHA1 hash.\n", idx );
 		free(piece_data);
