@@ -65,7 +65,7 @@ struct pwp_peer_node // node for linked list of peers
 struct pwp_piece
 {
 	struct pwp_peer_node *peers; // this is the HEAD pointer
-	uint8_t status;
+	uint8_t status; // this is one of the PIECE_STATUS values
 };
 
 struct pwp_block
@@ -124,6 +124,7 @@ int get_pieces(int socketfd, struct pwp_peer *peer);
 int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer);
 uint8_t *prepare_requests(int piece_idx, struct pwp_block *blocks, int num_of_blocks, int max_requests, int *len);
 int download_block(int socketfd, int expected_piece_idx, FILE *savedfp, struct pwp_block *block, struct pwp_peer *peer);
+int initialise_pieces(struct pwp_piece *pieces, const char *path_to_resume_file);
 
 int pwp_start(const char *md_filepath, const char *saved_filepath, const char *resume_filepath)
 {
@@ -183,8 +184,14 @@ int pwp_start(const char *md_filepath, const char *saved_filepath, const char *r
         }
         bencode_int_value(&b2, &g_num_of_pieces);
 
-	g_pieces = malloc(sizeof(struct pwp_piece) * g_num_of_pieces);
-        bzero(g_pieces, sizeof(struct pwp_piece) * g_num_of_pieces);
+	g_pieces = calloc(sizeof(struct pwp_piece) * g_num_of_pieces, 1);
+        if(initialise_pieces(g_pieces, g_resume_filepath) == -1)
+	{
+		rv = -1;
+		bf_log("[ERROR] pwp_start(): Failied to initialise g_pieces. Aborting.\n");
+		goto cleanup;
+	}
+
         g_pieces_mutexes = malloc(sizeof(pthread_mutex_t) * g_num_of_pieces);
         for(i=0; i<g_num_of_pieces; i++)
         {
@@ -1550,4 +1557,44 @@ void linked_list_free(struct pwp_peer_node **head)
 	*head = NULL;
 
 //        bf_log("---------------------------------------- FINISH:  LINKED_LIST_FREE ----------------------------------------\n");
+}
+
+int initialise_pieces(struct pwp_piece *pieces, const char *path_to_resume_file)
+{
+	int rv = 0;
+	int i, j;
+	uint8_t mask;
+	uint8_t *resume_data = NULL;
+	int resume_len;
+
+	if(util_read_whole_file(path_to_resume_file, &resume_data, &resume_len) != 0)
+	{
+		rv = -1;
+		bf_log("[ERROR] initialise_pieces(): Failed to read resume file '%s'.\n", path_to_resume_file);
+		goto cleanup;
+	}
+
+	for(i = 0; i < resume_len; i++)
+	{
+		for(j = 0; j < 8; j++)
+		{
+			mask = 0x80 >> j;
+			if(resume[i] & mask)
+			{
+				pieces[i*8 + j].status = PIECE_STATUS_COMPLETE;
+			}
+			else
+			{
+				pieces[i*8 + j].status = PIECE_STATUS_NOT_AVAILABLE;
+			}
+		}
+	}
+
+cleanup:
+	if(resume_data)
+	{
+		free(resume_data);
+	}
+
+	return rv;
 }
