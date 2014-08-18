@@ -98,6 +98,7 @@ char *g_saved_filepath = NULL;
 char *g_resume_filepath = NULL;
 
 pthread_mutex_t *g_pieces_mutexes = NULL;
+pthread_mutex_t *g_resume_mutexes = NULL;
 pthread_mutex_t g_downloaded_pieces_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 uint8_t *compose_handshake(uint8_t *info_hash, uint8_t *our_peer_id, int *len);
@@ -199,6 +200,14 @@ int pwp_start(const char *md_filepath, const char *saved_filepath, const char *r
                  pthread_mutex_init(&g_pieces_mutexes[i], NULL);
         }
 
+	int num_of_resume_bytes = g_num_of_pieces / 8;
+	num_of_resume_bytes += (g_num_of_pieces % 8) ? 1 : 0;
+	g_resume_mutexes = malloc(sizeof(pthread_mutex_t) * num_of_resume_bytes);
+        for(i=0; i<num_of_resume_bytes; i++)
+        {
+                 pthread_mutex_init(&g_resume_mutexes[i], NULL);
+        }
+
         bencode_dict_get_next(&b1, &b2, &str, &len);
         if(strncmp(str, "piece_length", 12) != 0)
         {
@@ -219,7 +228,6 @@ int pwp_start(const char *md_filepath, const char *saved_filepath, const char *r
         g_piece_hashes = malloc(len);
         memcpy(g_piece_hashes, str, len);
 	
-
 	bencode_dict_get_next(&b1, &b2, &str, &len);
         if(strncmp(str, "peers", 5) != 0)
         {
@@ -228,8 +236,6 @@ int pwp_start(const char *md_filepath, const char *saved_filepath, const char *r
                 goto cleanup;
         }
 
-	// TODO: initialise g_pieces array
-	
 	struct talk_to_peer_args *args;
 	pthread_t thread1;
 	int t1_rv, thread_count;
@@ -357,13 +363,17 @@ cleanup:
 		bf_log("[LOG] pwp_start: freeing g_pieces_mutexes.\n");
 		free(g_pieces_mutexes);
 	}
+	if(g_resume_mutexes)
+	{
+		bf_log("[LOG] pwp_start: freeing g_resume_mutexes.\n");
+		free(g_resume_mutexes);
+	}
 	if(g_piece_hashes)
         {
                 bf_log("[LOG] pwp_start: freeing g_piece_hashes.\n");
                 free(g_piece_hashes);
         }
 	
-//	bf_logger_end();
 	return rv;	
 }
 
