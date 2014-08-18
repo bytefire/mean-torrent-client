@@ -1605,9 +1605,10 @@ int update_resume_file(const char *path_to_resume_file, int downloaded_piece_idx
 	rv = -1;
 	int byte_index = downloaded_piece_index / 8;
 	uint8_t resume_byte;
-// TODO: acquire lock on g_resume_mutexes for the correct byte index (OR one mutex for the whole file ??)
+	uint8_t mask;
+// TODO: acquire lock on g_resume_mutexes[byte_index]
 
-	if(util_read_chunk(byte_index, 1, &resume_byte) == -1)
+	if(util_read_chunk(path_to_resume_file, byte_index, 1, &resume_byte) == -1)
 	{
 		// TODO: free the corresponding g_resume_mutexes here	
 	
@@ -1615,8 +1616,21 @@ int update_resume_file(const char *path_to_resume_file, int downloaded_piece_idx
 		bf_log("[ERROR] update_resume_file(): Failed to read the correct byte from the resume file '%s'.\n", path_to_resume_file);
 		goto cleanup;
 	}
-	
+	mask = 0x80 >> (downloaded_piece_idx % 8);
+	resume_byte |= mask;
+
+	FILE *resumefp = fopen(path_to_resume_file, "r+");
+	fseek(resumefp, byte_index, SEEK_SET);
+	fwrite(&resume_byte, 1, 1, resumefp);
+	fclose(resumefp);
+	resumefp = NULL;
+
+// TODO: release lock on g_resume_mutexes[byte_index]
 
 cleanup:
+	if(resumefp)
+	{
+		fclose(resumefp);
+	}
 	return rv;
 }
