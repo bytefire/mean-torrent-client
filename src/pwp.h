@@ -125,6 +125,7 @@ int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer);
 uint8_t *prepare_requests(int piece_idx, struct pwp_block *blocks, int num_of_blocks, int max_requests, int *len);
 int download_block(int socketfd, int expected_piece_idx, FILE *savedfp, struct pwp_block *block, struct pwp_peer *peer);
 int initialise_pieces(struct pwp_piece *pieces, const char *path_to_resume_file);
+int update_resume_file(const char *path_to_resume_file, int downloaded_piece_idx);
 
 int pwp_start(const char *md_filepath, const char *saved_filepath, const char *resume_filepath)
 {
@@ -1579,7 +1580,7 @@ int initialise_pieces(struct pwp_piece *pieces, const char *path_to_resume_file)
 		for(j = 0; j < 8; j++)
 		{
 			mask = 0x80 >> j;
-			if(resume[i] & mask)
+			if(resume_data[i] & mask)
 			{
 				pieces[i*8 + j].status = PIECE_STATUS_COMPLETE;
 			}
@@ -1596,5 +1597,26 @@ cleanup:
 		free(resume_data);
 	}
 
+	return rv;
+}
+
+int update_resume_file(const char *path_to_resume_file, int downloaded_piece_idx)
+{
+	rv = -1;
+	int byte_index = downloaded_piece_index / 8;
+	uint8_t resume_byte;
+// TODO: acquire lock on g_resume_mutexes for the correct byte index (OR one mutex for the whole file ??)
+
+	if(util_read_chunk(byte_index, 1, &resume_byte) == -1)
+	{
+		// TODO: free the corresponding g_resume_mutexes here	
+	
+		rv = -1;
+		bf_log("[ERROR] update_resume_file(): Failed to read the correct byte from the resume file '%s'.\n", path_to_resume_file);
+		goto cleanup;
+	}
+	
+
+cleanup:
 	return rv;
 }
