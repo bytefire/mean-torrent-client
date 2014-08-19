@@ -26,7 +26,7 @@
 (done) > move creation of saved file from pwp_start to main of client.
 (done) > create resume file inside main and use it to initialise g_pieces array inside pwp.
 > pwp.h to update the resume file.
->>>>> use locking in method to update resume file.
+>>>>> fix compile errors and then call the method to update resume file.
 
 long-term:
 ==========

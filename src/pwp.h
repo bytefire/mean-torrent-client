@@ -98,6 +98,7 @@ char *g_saved_filepath = NULL;
 char *g_resume_filepath = NULL;
 
 pthread_mutex_t *g_pieces_mutexes = NULL;
+// used to lock one byte of resume file when updating it. there will be one mutex per byte of the resume file
 pthread_mutex_t *g_resume_mutexes = NULL;
 pthread_mutex_t g_downloaded_pieces_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -126,7 +127,7 @@ int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer);
 uint8_t *prepare_requests(int piece_idx, struct pwp_block *blocks, int num_of_blocks, int max_requests, int *len);
 int download_block(int socketfd, int expected_piece_idx, FILE *savedfp, struct pwp_block *block, struct pwp_peer *peer);
 int initialise_pieces(struct pwp_piece *pieces, const char *path_to_resume_file);
-int update_resume_file(const char *path_to_resume_file, int downloaded_piece_idx);
+int update_resume_file(const char *path_to_resume_file, int downloaded_piece_index);
 
 int pwp_start(const char *md_filepath, const char *saved_filepath, const char *resume_filepath)
 {
@@ -1610,23 +1611,27 @@ cleanup:
 	return rv;
 }
 
-int update_resume_file(const char *path_to_resume_file, int downloaded_piece_idx)
+int update_resume_file(const char *path_to_resume_file, int downloaded_piece_index)
 {
-	rv = -1;
+	int rv = -1;
 	int byte_index = downloaded_piece_index / 8;
 	uint8_t resume_byte;
 	uint8_t mask;
 // TODO: acquire lock on g_resume_mutexes[byte_index]
+	/*-X-X-X- START OF CRITICAL REGION  -X-X-X-*/
+        bf_log("[LOG] update_resume_file(): Going to lock g_resume_mutexes[%d].\n", byte_index);
+        pthread_mutex_lock(&g_resume_mutexes[byte_index]);
+        bf_log("[LOG] update_resume_file(): Successfully locked g_resume_mutexes[%d].\n", byte_index);
 
 	if(util_read_chunk(path_to_resume_file, byte_index, 1, &resume_byte) == -1)
 	{
 		// TODO: free the corresponding g_resume_mutexes here	
-	
+		pthread_mutex_unlock(&g_resume_mutexes[byte_index]);	
 		rv = -1;
-		bf_log("[ERROR] update_resume_file(): Failed to read the correct byte from the resume file '%s'.\n", path_to_resume_file);
+		bf_log("[ERROR] update_resume_file(): Failed to read the correct byte from the resume file '%s'. Released g_resume_mutexes[%d].\n", path_to_resume_file, byte_index);
 		goto cleanup;
 	}
-	mask = 0x80 >> (downloaded_piece_idx % 8);
+	mask = 0x80 >> (downloaded_piece_index % 8);
 	resume_byte |= mask;
 
 	FILE *resumefp = fopen(path_to_resume_file, "r+");
@@ -1636,6 +1641,8 @@ int update_resume_file(const char *path_to_resume_file, int downloaded_piece_idx
 	resumefp = NULL;
 
 // TODO: release lock on g_resume_mutexes[byte_index]
+	bf_log("[LOG] Going to release g_resume_mutexes[%d].\n", byte_index);
+	pthread_mutex_unlock(&g_resume_mutexes[byte_index]);
 
 cleanup:
 	if(resumefp)
