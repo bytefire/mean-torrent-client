@@ -974,20 +974,28 @@ int get_pieces(int socketfd, struct pwp_peer *peer)
 		bf_log("[LOG] Chose random piece index: %d\n", idx);
 		rv = download_piece(idx, socketfd, savedfp, peer);
 
-		/* -X-X-X- CRITICAL REGION START -X-X-X- */
-		pthread_mutex_lock(&g_pieces_mutexes[idx]);
-
 		if(rv == 0)
 		{
+			// TODO: call update_resume_file method here...
+
+			/* -X-X-X- CRITICAL REGION START -X-X-X- */
+	                pthread_mutex_lock(&g_pieces_mutexes[idx]);
+	
 			g_pieces[idx].status = PIECE_STATUS_COMPLETE;
+
+			pthread_mutex_unlock(&g_pieces_mutexes[idx]);
+	                /* -X-X-X- CRITICAL REGION END -X-X-X- */
 		}
 		else
 		{
-			g_pieces[idx].status = PIECE_STATUS_AVAILABLE;
-		}
+			/* -X-X-X- CRITICAL REGION START -X-X-X- */
+                        pthread_mutex_lock(&g_pieces_mutexes[idx]);
 
-		pthread_mutex_unlock(&g_pieces_mutexes[idx]);
-		/* -X-X-X- CRITICAL REGION END -X-X-X- */
+			g_pieces[idx].status = PIECE_STATUS_AVAILABLE;
+
+			pthread_mutex_unlock(&g_pieces_mutexes[idx]);
+			/* -X-X-X- CRITICAL REGION END -X-X-X- */
+		}
 
 		/* -X-X-X- CRITICAL REGION START -X-X-X- */
                 pthread_mutex_lock(&g_downloaded_pieces_mutex);
@@ -1065,7 +1073,7 @@ int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer)
 		curr[num_of_blocks-1].length = bytes_in_last_block;
 	}
 
-// No 4 to p above:
+// No 4 to 9 above:
 	requests = prepare_requests(idx, blocks, num_of_blocks, BLOCK_REQUESTS_COUNT, &len);
 	int outstanding_requests = BLOCK_REQUESTS_COUNT;
 	while(requests)
@@ -1259,12 +1267,6 @@ int download_block(int socketfd, int expected_piece_idx, FILE *savedfp, struct p
 	block->offset = block_offset;
 	bf_log("[LOG] *-*-*- Going to receive piece_idx: %d, block_offset: %d, block length: %d.\n", piece_idx, block_offset, remaining);
 
-	/* -X-X-X- CRITICAL REGION START (for saved file) -X-X-X- */
-	// TODO: create a separate file pointer in each thread. that way this locking won't be required. 
-	//	that is because each file pointer will be writing in separate locations of the file.
-	//	the aim is to completely remove g_savedfp and g_savedfp_mutex.
-	// pthread_mutex_lock(&g_savedfp_mutex);
-
 	fseek(savedfp, (piece_idx * g_piece_length) + block_offset, SEEK_SET);
 	len = 512; //use len as buffer for following loop	
 
@@ -1289,9 +1291,6 @@ int download_block(int socketfd, int expected_piece_idx, FILE *savedfp, struct p
 		remaining -= len;
 		bytes_saved += len;
 	}
-
-	// pthread_mutex_unlock(&g_savedfp_mutex);
-	/* -X-X-X- CRITICAL REGION END (for saved file) -X-X-X- */
 
 	// if here then the block must have been successfully downloaded. update the block struct.
 	block->status = BLOCK_STATUS_DOWNLOADED;
