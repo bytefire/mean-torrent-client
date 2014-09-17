@@ -1623,7 +1623,7 @@ int update_resume_file(const char *path_to_resume_file, int downloaded_piece_ind
         pthread_mutex_lock(&g_resume_mutexes[byte_index]);
         bf_log("[LOG] update_resume_file(): Successfully locked g_resume_mutexes[%d].\n", byte_index);
 
-	if(util_read_chunk(path_to_resume_file, byte_index, 1, &resume_byte) == -1)
+	if(util_read_file_chunk(path_to_resume_file, byte_index, 1, &resume_byte) == -1)
 	{
 		// TODO: free the corresponding g_resume_mutexes here	
 		pthread_mutex_unlock(&g_resume_mutexes[byte_index]);	

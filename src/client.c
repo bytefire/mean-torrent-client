@@ -13,7 +13,7 @@
 #define PEER_ID_HEX "dd0e76bcc7f711e3af893c77e686ca85b8f12e24";
 /*********************************************************************/
 
-#define LOG_FILE "/home/bytefire/dev/code/bit-torrent-client/src/bin/logs/client.log"
+#define LOG_FILE "/home/bytefire/programming/code/bit-torrent-client/src/bin/logs/client.log"
 #define USAGE_MESSAGE "Usage: client <path-to-torrent-file> {fresh|new}\n"
 
 #define MODE_DEFAULT 0
