@@ -36,6 +36,9 @@ int create_resume_file(const char *filename, int num_of_pieces);
 
 int main(int argc, char *argv[])
 {
+	// TODO: for testing only!!
+	int crfrv = create_resume_file("test.resume", 242);
+	
 	char *torrent_filename = NULL;
 	char *filename = NULL;
 	char *announce_filename = NULL;
@@ -300,14 +303,14 @@ int create_resume_file(const char *filename, int num_of_pieces)
 	int rv = 0;
 	int size_in_bytes = num_of_pieces/8;
 	size_in_bytes += (num_of_pieces%8) ? 1: 0;
-	char *data = (char *)calloc(size_in_bytes, 1);
+	//char *data = (char *)calloc(size_in_bytes, 1);
 	
-	if(util_write_new_file(filename, data) != 0)
+	if(util_create_file_of_size(filename, size_in_bytes) != 0)
 	{
 		rv = -1;
 	}
 
-	free(data);
+	//free(data);
 
 	return rv;
 }

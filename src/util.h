@@ -105,7 +105,7 @@ int util_create_file_of_size(const char *file_name, long bytes)
         }
 
 	fseek(fp, bytes - 1, SEEK_SET);
-	fputc('\n', fp);
+	fputc('\0', fp);
 	fclose(fp);
 	return 0;
 }
