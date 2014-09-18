@@ -35,10 +35,7 @@ int generate_metadata_file(char *announce_filename, struct metafile_info *mi, ch
 int create_resume_file(const char *filename, int num_of_pieces);
 
 int main(int argc, char *argv[])
-{
-	// TODO: for testing only!!
-	int crfrv = create_resume_file("test.resume", 242);
-	
+{	
 	char *torrent_filename = NULL;
 	char *filename = NULL;
 	char *announce_filename = NULL;
@@ -245,7 +242,7 @@ int generate_announce_file(struct metafile_info *mi, char *hash, char *filename_
 
         request_url = get_first_request(mi->announce_url, hash, peer_id_hex, mi->length);
         tracker_response = (char *)make_tracker_http_request(request_url);
-        util_write_new_file(filename_to_generate, tracker_response);
+        util_write_new_file(filename_to_generate, (uint8_t *)tracker_response, strlen(tracker_response));
 
 cleanup:
 	if(request_url)
@@ -301,16 +298,16 @@ cleanup:
 int create_resume_file(const char *filename, int num_of_pieces)
 {
 	int rv = 0;
-	int size_in_bytes = num_of_pieces/8;
-	size_in_bytes += (num_of_pieces%8) ? 1: 0;
-	//char *data = (char *)calloc(size_in_bytes, 1);
+	int size_in_bytes = num_of_pieces / 8;
+	size_in_bytes += (num_of_pieces % 8) ? 1 : 0;
+	uint8_t *data = (uint8_t *)calloc(size_in_bytes, 1);
 	
-	if(util_create_file_of_size(filename, size_in_bytes) != 0)
+	if(util_write_new_file(filename, data, size_in_bytes) != 0)
 	{
 		rv = -1;
 	}
 
-	//free(data);
+	free(data);
 
 	return rv;
 }
