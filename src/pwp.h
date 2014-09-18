@@ -977,14 +977,36 @@ int get_pieces(int socketfd, struct pwp_peer *peer)
 		if(rv == 0)
 		{
 			// TODO: call update_resume_file method here...
-
-			/* -X-X-X- CRITICAL REGION START -X-X-X- */
-	                pthread_mutex_lock(&g_pieces_mutexes[idx]);
+			rv = update_resume_file(g_resume_filepath, idx);
+			if(rv == 0)
+			{
+				/* -X-X-X- CRITICAL REGION START -X-X-X- */
+		                pthread_mutex_lock(&g_pieces_mutexes[idx]);
 	
-			g_pieces[idx].status = PIECE_STATUS_COMPLETE;
+				g_pieces[idx].status = PIECE_STATUS_COMPLETE;
 
-			pthread_mutex_unlock(&g_pieces_mutexes[idx]);
-	                /* -X-X-X- CRITICAL REGION END -X-X-X- */
+				pthread_mutex_unlock(&g_pieces_mutexes[idx]);
+		                /* -X-X-X- CRITICAL REGION END -X-X-X- */
+
+				/* -X-X-X- CRITICAL REGION START -X-X-X- */
+			        pthread_mutex_lock(&g_downloaded_pieces_mutex);
+
+			        g_downloaded_pieces++;
+
+		        	pthread_mutex_unlock(&g_downloaded_pieces_mutex);
+	        		/* -X-X-X- CRITICAL REGION END -X-X-X- */
+			}
+			else
+			{
+				bf_log("[ERROR] get_pieces(): Piece at idx %d downloaded successfully but failed to update resume file. This piece will be considered as failed to download.\n", idx);
+				/* -X-X-X- CRITICAL REGION START -X-X-X- */
+                                pthread_mutex_lock(&g_pieces_mutexes[idx]);
+
+                                g_pieces[idx].status = PIECE_STATUS_AVAILABLE;
+
+                                pthread_mutex_unlock(&g_pieces_mutexes[idx]);
+                                /* -X-X-X- CRITICAL REGION END -X-X-X- */
+			}
 		}
 		else
 		{
@@ -1148,14 +1170,6 @@ int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer)
 
 	free(piece_hash);
 	piece_hash = NULL;	
-
-	/* -X-X-X- CRITICAL REGION START -X-X-X- */
-        pthread_mutex_lock(&g_downloaded_pieces_mutex);
-
-        g_downloaded_pieces++;
-
-        pthread_mutex_unlock(&g_downloaded_pieces_mutex);
-        /* -X-X-X- CRITICAL REGION END -X-X-X- */
 
         bf_log("[LOG] *-*-*-*- Downloaded piece!! Piece index: %d.\n", idx);
 
