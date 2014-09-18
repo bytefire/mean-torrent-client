@@ -24,7 +24,7 @@
 21. in pwp.h, PIECE_STATUS_AVAILABLE etc should be enums.
 ---------------------------------
 
-> test that resume file is updating correctly and then go to no 20 above.
+> test that resume file is updating correctly by putting a breakpoint in get_pieces() method after a piece has been downloaded. break into update_resume_file() method call.
 
 (done) > call pwp_start inside main of client, compile and test it end-to-end.
 (done) > clean up client.c

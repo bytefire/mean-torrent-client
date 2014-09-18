@@ -1167,6 +1167,7 @@ int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer)
 	}
 
 	bf_log("[LOG] download_piece(): Successfulle verified SHA1 of piece at index %d.\n", idx);
+	rv = 0;
 
 	free(piece_hash);
 	piece_hash = NULL;	
