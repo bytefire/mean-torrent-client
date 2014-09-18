@@ -1584,6 +1584,7 @@ void linked_list_free(struct pwp_peer_node **head)
 //        bf_log("---------------------------------------- FINISH:  LINKED_LIST_FREE ----------------------------------------\n");
 }
 
+// NOTE: this method is not thread-safe. only call this in a single thread.
 int initialise_pieces(struct pwp_piece *pieces, const char *path_to_resume_file)
 {
 	int rv = 0;
@@ -1606,7 +1607,10 @@ int initialise_pieces(struct pwp_piece *pieces, const char *path_to_resume_file)
 			mask = 0x80 >> j;
 			if(resume_data[i] & mask)
 			{
+				// NOTE that no mutexes are used here because this method is called from pwp_start()
+				// method which is always called in a single thread.
 				pieces[i*8 + j].status = PIECE_STATUS_COMPLETE;
+				g_downloaded_pieces++;
 			}
 			else
 			{

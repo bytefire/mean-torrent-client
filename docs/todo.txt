@@ -20,16 +20,16 @@
 (done) 17. working on write_new_file() method in util.h. then check the methods called inside generate_announce_file() method in client.c.
 18. in sha1_compute() method, instead of allocating a 20 bytes for sha1 hash, this method should take in pre-allocated 20-byte array and just populate it.
 19. log file path in client.c is hard coded absolute path. that is because we change working directory when we enter the loff/ folder so we can't use relative path. one solution is to obtain absolute path to log file by using the relative path and then use that path (preferred). alternatively we can not change the working directory at all so working directory always remains the same. then we can use the relative path.
-20. IMPORTANT: in pwp_start() when initialising data from resume file, update the g_downloaded_pieces counter. caveate is when we download only 3 pieces...
+(done) 20. IMPORTANT: in pwp_start() when initialising data from resume file, update the g_downloaded_pieces counter. caveate is when we download only 3 pieces...
 21. in pwp.h, PIECE_STATUS_AVAILABLE etc should be enums.
 ---------------------------------
+
+> test that resume file is updating correctly and then go to no 20 above.
 
 (done) > call pwp_start inside main of client, compile and test it end-to-end.
 (done) > clean up client.c
 (done) > move creation of saved file from pwp_start to main of client.
 (done) > create resume file inside main and use it to initialise g_pieces array inside pwp.
-> pwp.h to update the resume file.
->>>>> fix compile errors and then call the method to update resume file.
 
 long-term:
 ==========
