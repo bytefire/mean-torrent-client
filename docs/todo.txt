@@ -1,40 +1,23 @@
-(done) 1. test reading a chunk from file
-(done) 2. test the creation of meatadata file without extra four fields
-(done) 3. add 'pieces' (concatenation of sha1 hashes of all pieces) from torrent file into the metadata file.
-(done) 4. verify the piece hashes are correct.
-(done) 4. write method to load sha1 of a given piece index from metadata file (where will that code go?)
-(done) 5. compare the computed sha1 with the one extracted from metadata file.
-(done) 6. remove util_append_to_file method and replace its calls with fwrite.
-(done) 6. test the comparison of sha1's.
-(done) 7. in util_read_whole_file(), put the single fread inside a loop.
-(done) 8. in pwp.h, remove g_savedfp and g_savedfp_mutex. each piece_download() method should create its own savedfp. that wouldn't conflict because each thread would be writing to a different part of the savedfile, i.e. no two threads can be downloading the same piece simultaneously.
-(done) 9. test download with multiple threads after a separate savedfp for each thread.
-(done) 10. when validating piece hash, put the check BEFORE updating global variables, so that if the check fails then that piece is marked as not downloaded and available to be downloaded (i.e. some other thread can pick that piece up for download.)
-(done) 11. prepare_requests to also return the number of requests it was able to prepare. in the inner while loop inside download_block() we loop until either we get the number of blocks we requested or it times out. that way we only time out when a request was unfulfilled.
 12. inside bf_logger print date in compact format.
-(done) 13. investigate application freezing after downloading desired number of pieces when running multiple threads.
-
-(done) 14. add a utils.h method to append a string to another string and return a new string. used for generating metadata, resume etc filenames.
-(done) 15. add utils.h methods to create and delete files and folders (?) ---> actually done inside client.cs rather than util.h
-(done) 16. test these two methods individually: extract_filename() in client.c and util_copy_file() in util.h
-(done) 17. working on write_new_file() method in util.h. then check the methods called inside generate_announce_file() method in client.c.
 18. in sha1_compute() method, instead of allocating a 20 bytes for sha1 hash, this method should take in pre-allocated 20-byte array and just populate it.
 19. log file path in client.c is hard coded absolute path. that is because we change working directory when we enter the loff/ folder so we can't use relative path. one solution is to obtain absolute path to log file by using the relative path and then use that path (preferred). alternatively we can not change the working directory at all so working directory always remains the same. then we can use the relative path.
 (done) 20. IMPORTANT: in pwp_start() when initialising data from resume file, update the g_downloaded_pieces counter. caveate is when we download only 3 pieces...
 21. in pwp.h, PIECE_STATUS_AVAILABLE etc should be enums.
-22. IMPORTANT: make_tracker_http_request() method in client.c should also return output.size. the calling method should use that size to write to file rather than doing strlen.
+22. (done) IMPORTANT: make_tracker_http_request() method in client.c should also return output.size. the calling method should use that size to write to file rather than doing strlen.
 ---------------------------------
 
-(done) > test that resume file is updating correctly by putting a breakpoint in get_pieces() method after a piece has been downloaded. break into update_resume_file() method call.
-
-(done) > call pwp_start inside main of client, compile and test it end-to-end.
-(done) > clean up client.c
-(done) > move creation of saved file from pwp_start to main of client.
-(done) > create resume file inside main and use it to initialise g_pieces array inside pwp.
+> total size of the file is not exact multiple of piece size. so the last piece is not the same size as others. we need to find the size from torrent file or announce file and then create saved file accordingly. we also need to look for the correct block numbers and not those outside the limit. should we save piece size with each struct that represents a piece in pwp.h file?
 
 long-term:
 ==========
 
-1. connect client to pwp_start
-2. ability to resume download
-3. remove warnings
+1. download one complete file
+2. test ability to resume download
+3. make sure download works fine.
+4. separate code into header and code files.
+5. complete all todo's.
+6. remove all warnings.
+7. complete documentation.
+8. close.
+
+AIM of MeanTorrent is to be able to JUST download single-file torrents.

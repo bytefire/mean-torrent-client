@@ -270,7 +270,7 @@ int pwp_start(const char *md_filepath, const char *saved_filepath, const char *r
 	struct timespec ts;
 
 /********** SECOND loop to replace any completed threads with new ones. *******************/
-	while(count < PIECES_TO_DOWNLOAD)
+	while(count < g_num_of_pieces)
 	{
 		// this for loop goes over each thread checking if it has completed. 
 		for(thread_count = 0; thread_count < MAX_THREADS; thread_count++)
@@ -953,7 +953,7 @@ int get_pieces(int socketfd, struct pwp_peer *peer)
         pthread_mutex_unlock(&g_downloaded_pieces_mutex);
         /* -X-X-X- CRITICAL REGION END -X-X-X- */
 
-        if(count >= PIECES_TO_DOWNLOAD)
+        if(count >= g_num_of_pieces)
         {
                 bf_log("[LOG] get_pieces(): Not downloading any further pieces as the desired no of pieces have been downloaded.\n");
                 goto cleanup;
@@ -1027,7 +1027,7 @@ int get_pieces(int socketfd, struct pwp_peer *peer)
                 pthread_mutex_unlock(&g_downloaded_pieces_mutex);
                 /* -X-X-X- CRITICAL REGION END -X-X-X- */
 
-                if(count >= PIECES_TO_DOWNLOAD)
+                if(count >= g_num_of_pieces)
                 {
                         bf_log("[LOG] get_pieces(): Not downloading any further pieces as the desired no of pieces have been downloaded.\n");
 
