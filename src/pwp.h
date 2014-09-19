@@ -1631,7 +1631,7 @@ cleanup:
 
 int update_resume_file(const char *path_to_resume_file, int downloaded_piece_index)
 {
-	int rv = -1;
+	int rv = 0;
 	int byte_index = downloaded_piece_index / 8;
 	uint8_t resume_byte;
 	uint8_t mask;
