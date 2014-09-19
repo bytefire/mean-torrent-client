@@ -22,9 +22,10 @@
 19. log file path in client.c is hard coded absolute path. that is because we change working directory when we enter the loff/ folder so we can't use relative path. one solution is to obtain absolute path to log file by using the relative path and then use that path (preferred). alternatively we can not change the working directory at all so working directory always remains the same. then we can use the relative path.
 (done) 20. IMPORTANT: in pwp_start() when initialising data from resume file, update the g_downloaded_pieces counter. caveate is when we download only 3 pieces...
 21. in pwp.h, PIECE_STATUS_AVAILABLE etc should be enums.
+22. IMPORTANT: make_tracker_http_request() method in client.c should also return output.size. the calling method should use that size to write to file rather than doing strlen.
 ---------------------------------
 
-> test that resume file is updating correctly by putting a breakpoint in get_pieces() method after a piece has been downloaded. break into update_resume_file() method call.
+(done) > test that resume file is updating correctly by putting a breakpoint in get_pieces() method after a piece has been downloaded. break into update_resume_file() method call.
 
 (done) > call pwp_start inside main of client, compile and test it end-to-end.
 (done) > clean up client.c
