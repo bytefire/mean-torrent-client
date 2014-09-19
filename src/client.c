@@ -29,7 +29,7 @@ struct buffer_struct
 static size_t write_memory_callback(void *ptr, size_t size, size_t nmemb, void *data);
 char *get_first_request(char *announce_url, char *info_hash_hex, char *peer_id_hex, long int file_size);
 int parse_torrent_file(char *torrent_filename, struct metafile_info *mi, char *hash);
-char *make_tracker_http_request(char *request);
+char *make_tracker_http_request(char *request, int *len);
 int generate_announce_file(struct metafile_info *mi, char *hash, char *filename_to_generate);
 int generate_metadata_file(char *announce_filename, struct metafile_info *mi, char *filename_to_generate);
 int create_resume_file(const char *filename, int num_of_pieces);
@@ -236,13 +236,14 @@ cleanup:
 int generate_announce_file(struct metafile_info *mi, char *hash, char *filename_to_generate)
 {
 	int rv = 0;
+	int len;
 	char *request_url = NULL;
 	char *tracker_response = NULL;
 	char *peer_id_hex = PEER_ID_HEX;
 
         request_url = get_first_request(mi->announce_url, hash, peer_id_hex, mi->length);
-        tracker_response = (char *)make_tracker_http_request(request_url);
-        util_write_new_file(filename_to_generate, (uint8_t *)tracker_response, strlen(tracker_response));
+        tracker_response = (char *)make_tracker_http_request(request_url, &len);
+        util_write_new_file(filename_to_generate, (uint8_t *)tracker_response, len);
 
 cleanup:
 	if(request_url)
@@ -312,7 +313,7 @@ int create_resume_file(const char *filename, int num_of_pieces)
 	return rv;
 }
 
-char *make_tracker_http_request(char *request)
+char *make_tracker_http_request(char *request, int *len)
 {
 	curl_global_init(CURL_GLOBAL_ALL);
         CURL *my_handle;
@@ -328,6 +329,8 @@ char *make_tracker_http_request(char *request)
         result = curl_easy_perform(my_handle);
         curl_easy_cleanup(my_handle);	
 	
+	*len = output.size;
+	// TODO: memory leak here!! output.buffer needs to be freed. it is allocated in write_memory_callback method.	
 	return output.buffer;
 }
 
