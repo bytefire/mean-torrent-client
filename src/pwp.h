@@ -66,6 +66,7 @@ struct pwp_piece
 {
 	struct pwp_peer_node *peers; // this is the HEAD pointer
 	uint8_t status; // this is one of the PIECE_STATUS values
+	long int piece_length; // we need to store this for each piece because the last piece will have a different size from the rest.
 };
 
 struct pwp_block
@@ -90,6 +91,7 @@ struct thread_data
 };
 
 struct pwp_piece *g_pieces = NULL;
+long int g_total_length = -1;
 long int g_piece_length = -1;
 long int g_num_of_pieces = -1;
 long int g_downloaded_pieces = 0;
@@ -126,7 +128,7 @@ int get_pieces(int socketfd, struct pwp_peer *peer);
 int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer);
 uint8_t *prepare_requests(int piece_idx, struct pwp_block *blocks, int num_of_blocks, int max_requests, int *len);
 int download_block(int socketfd, int expected_piece_idx, FILE *savedfp, struct pwp_block *block, struct pwp_peer *peer);
-int initialise_pieces(struct pwp_piece *pieces, const char *path_to_resume_file);
+int initialise_pieces(struct pwp_piece *pieces, long int total_length, long int num_of_pieces, long int piece_length, const char *path_to_resume_file);
 int update_resume_file(const char *path_to_resume_file, int downloaded_piece_index);
 
 int pwp_start(const char *md_filepath, const char *saved_filepath, const char *resume_filepath)
@@ -179,6 +181,15 @@ int pwp_start(const char *md_filepath, const char *saved_filepath, const char *r
         memcpy(our_peer_id, str, len);
 
 	bencode_dict_get_next(&b1, &b2, &str, &len);
+        if(strncmp(str, "total_length", 12) != 0)
+        {
+                rv = -1;
+                bf_log(  "Failed to find 'num_of_pieces' in metadata file.\n");
+                goto cleanup;
+        }
+        bencode_int_value(&b2, &g_total_length);
+
+	bencode_dict_get_next(&b1, &b2, &str, &len);
         if(strncmp(str, "num_of_pieces", 13) != 0)
         {
                 rv = -1;
@@ -186,14 +197,6 @@ int pwp_start(const char *md_filepath, const char *saved_filepath, const char *r
                 goto cleanup;
         }
         bencode_int_value(&b2, &g_num_of_pieces);
-
-	g_pieces = calloc(sizeof(struct pwp_piece) * g_num_of_pieces, 1);
-        if(initialise_pieces(g_pieces, g_resume_filepath) == -1)
-	{
-		rv = -1;
-		bf_log("[ERROR] pwp_start(): Failied to initialise g_pieces. Aborting.\n");
-		goto cleanup;
-	}
 
         g_pieces_mutexes = malloc(sizeof(pthread_mutex_t) * g_num_of_pieces);
         for(i=0; i<g_num_of_pieces; i++)
@@ -234,6 +237,14 @@ int pwp_start(const char *md_filepath, const char *saved_filepath, const char *r
         {
                 rv = -1;
 		bf_log(  "Failed to find 'peers' in metadata file.\n");
+                goto cleanup;
+        }
+
+	g_pieces = calloc(sizeof(struct pwp_piece) * g_num_of_pieces, 1);
+        if(initialise_pieces(g_pieces, g_total_length, g_num_of_pieces, g_piece_length, g_resume_filepath) == -1)
+        {
+                rv = -1;
+                bf_log("[ERROR] pwp_start(): Failied to initialise g_pieces. Aborting.\n");
                 goto cleanup;
         }
 
@@ -305,9 +316,6 @@ int pwp_start(const char *md_filepath, const char *saved_filepath, const char *r
 				bf_log("[LOG] ********pwp_start(): Couldn't join thread %d within timeout.\n", td[thread_count].thread_descriptor);
 			}
         	}
-	
-		
-
 
 		/* -X-X-X- CRITICAL REGION START -X-X-X- */
 		pthread_mutex_lock(&g_downloaded_pieces_mutex);
@@ -1073,8 +1081,9 @@ int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer)
 
 	rv = 0;
 // No 1 above:
-	int num_of_blocks = g_piece_length / BLOCK_LEN;
-	int bytes_in_last_block = g_piece_length % BLOCK_LEN;
+	// NOTE we don't need to acquire lock to read piece_length as that field is never modified once it is initialised.
+	int num_of_blocks = g_pieces[idx].piece_length / BLOCK_LEN;
+	int bytes_in_last_block = g_pieces[idx].piece_length % BLOCK_LEN;
 
 	if(bytes_in_last_block)
 	{
@@ -1130,15 +1139,15 @@ int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer)
 	free(requests);
         requests = NULL;
 
-	// TODO: HOW do we take care of length of last piece! it will usually be less than g_piece_length.
-	uint8_t *piece_data = (uint8_t *)malloc(g_piece_length);	
+	// again, we don't need to acquire lock to access piece_length of the current piece in g_pieces array as piece_length doesn't cahnge.
+	uint8_t *piece_data = (uint8_t *)malloc(g_pieces[idx].piece_length);
 
 	// flush file buffer before reading the chunk. this is imporant because otherwise sha1 to be computed will be incorrect.
 	fflush(savedfp);
 
 	// TODO: this can be made to use savedfp rather than openinig the file separately. Take caution that util_read_file_chunk 
 	//	then doesn't change the position of file pointer so as to write at incorrect pos when downloading next piece.	
-	if(util_read_file_chunk(g_saved_filepath, idx *  g_piece_length, g_piece_length, piece_data) != 0)
+	if(util_read_file_chunk(g_saved_filepath, idx *  g_piece_length, g_pieces[idx].piece_length, piece_data) != 0)
 	{
 		bf_log("[ERROR] download_piece(): Faile to read piece number %d from file, therefore unable to verify SHA1 hash.\n", idx );
 		free(piece_data);
@@ -1147,7 +1156,7 @@ int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer)
                 goto cleanup;
 	}
 	
-	uint8_t *piece_hash = sha1_compute(piece_data, g_piece_length);
+	uint8_t *piece_hash = sha1_compute(piece_data, g_pieces[idx].piece_length);
 
 	// compute the index of first byte of the actual piece hash inside the global piece hashes string
 	i = idx * 20;
@@ -1586,7 +1595,7 @@ void linked_list_free(struct pwp_peer_node **head)
 }
 
 // NOTE: this method is not thread-safe. only call this in a single thread.
-int initialise_pieces(struct pwp_piece *pieces, const char *path_to_resume_file)
+int initialise_pieces(struct pwp_piece *pieces, long int total_length, long int num_of_pieces, long int piece_length, const char *path_to_resume_file)
 {
 	int rv = 0;
 	int i, j;
@@ -1617,8 +1626,12 @@ int initialise_pieces(struct pwp_piece *pieces, const char *path_to_resume_file)
 			{
 				pieces[i*8 + j].status = PIECE_STATUS_NOT_AVAILABLE;
 			}
+			pieces[i*8 + j].piece_length = piece_length; 
 		}
 	}
+
+	// length of last piece will be different from the rest of the pieces.
+	pieces[num_of_pieces - 1].piece_length = total_length % piece_length;
 
 cleanup:
 	if(resume_data)

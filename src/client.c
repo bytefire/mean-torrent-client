@@ -164,7 +164,7 @@ int main(int argc, char *argv[])
 	// NOTE that whenever we create a new saved file we must also create a new resume file.
 	if(stat(saved_filename, &s) == -1)
 	{
-	        if(util_create_file_of_size(saved_filename, mi.num_of_pieces * mi.piece_length) != 0)
+	        if(util_create_file_of_size(saved_filename, mi.length) != 0)
         	{
                 	bf_log("[ERROR] client.main(): Failed to create saved file. Aborting.\n");
 	                rv = -1;
