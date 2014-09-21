@@ -282,7 +282,7 @@ int generate_metadata_file(char *announce_filename, struct metafile_info *mi, ch
 		rv = -1;
 		goto cleanup;
 	}
-        peers_create_metadata(announce_data, len, info_hash, mi->pieces,  our_peer_id, mi->num_of_pieces, mi->piece_length, filename_to_generate);
+        peers_create_metadata(announce_data, len, info_hash, mi->pieces,  our_peer_id, mi->length, mi->num_of_pieces, mi->piece_length, filename_to_generate);
 cleanup:
 	if(announce_data)
 	{

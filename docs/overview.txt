@@ -15,10 +15,11 @@ Whole file is one bencoded dictionary with following keys.
 
 1. info_hash: 20 byte info hash
 2. our_peer_id: 20 byte our peer id
-3. num_of_pieces (integer): total number of pieces
-4. piece_length (integer): length of each piece in bytes
-5. piece_hashes (byte string): all the sha1 hashes from torrent file. this is the info hash part of torrent file.
-6. peers (list of dictionaries): each element is a dictionary with following keys.
+3. total_length (integer): total length of the file to be downloaded
+4. num_of_pieces (integer): total number of pieces
+5. piece_length (integer): length of each piece in bytes
+6. piece_hashes (byte string): all the sha1 hashes from torrent file. this is the info hash part of torrent file.
+7. peers (list of dictionaries): each element is a dictionary with following keys.
         a. ip
         b. port
 

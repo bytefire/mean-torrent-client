@@ -113,14 +113,15 @@ Whole file is one bencoded dictionary with following keys.
 
 1. info_hash: 20 byte info hash
 2. our_peer_id: 20 byte our peer id
-3. num_of_pieces (integer): total number of pieces
-4. piece_length (integer): length of each piece in bytes
-5. piece_hashes: sha1 hashes of all the pieces.
-6. peers (list of dictionaries): each element is a dictionary with following keys.
+3. total_length (integer): total size of the file to be downloaded
+4. num_of_pieces (integer): total number of pieces
+5. piece_length (integer): length of each piece in bytes
+6. piece_hashes: sha1 hashes of all the pieces.
+7. peers (list of dictionaries): each element is a dictionary with following keys.
 	a. ip
 	b. port
 */
-void peers_create_metadata(char *announce, int len, uint8_t *info_hash, uint8_t *piece_hashes, uint8_t *our_peer_id, long int num_of_pieces, long int piece_length, const char *metadata_filename)
+void peers_create_metadata(char *announce, int len, uint8_t *info_hash, uint8_t *piece_hashes, uint8_t *our_peer_id, long int total_length, long int num_of_pieces, long int piece_length, const char *metadata_filename)
 {
 	struct peer *head, *curr;
 	FILE *fp;
@@ -136,6 +137,8 @@ void peers_create_metadata(char *announce, int len, uint8_t *info_hash, uint8_t 
 
         fprintf(fp, "11:our_peer_id20:");
         fwrite(our_peer_id, 1, 20, fp);
+
+	fprintf(fp, "12:total_lengthi%lde", total_length);
 
 	fprintf(fp, "13:num_of_piecesi%lde", num_of_pieces);
         

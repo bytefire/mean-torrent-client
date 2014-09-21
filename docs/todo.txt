@@ -8,6 +8,10 @@
 
 > total size of the file is not exact multiple of piece size. so the last piece is not the same size as others. we need to find the size from torrent file or announce file and then create saved file accordingly. we also need to look for the correct block numbers and not those outside the limit. should we save piece size with each struct that represents a piece in pwp.h file?
 
+- (done) in client.c obtain correct total size from info dictionary of the torrent file (a.k.a. metainfo file) and save it in metadata file.
+- in pwp_start() load total file length from metadata file.
+- at line 165 in client.c, create saved file of correct size (not a multiple of number of pieces).
+
 long-term:
 ==========
 
