@@ -1167,7 +1167,9 @@ int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer)
 		{
 			bf_log("[ERROR] download_piece(): Verification of SHA1 piece number %d failed.\n", idx );
 	                bf_log_binary("  > Computed piece hash: ", piece_hash, 20);
+			bf_log("\n");
 			bf_log_binary("  > Actual piece hash: ", actual_sha1, 20);
+			bf_log("\n");
 			free(piece_hash);
         	        piece_hash = NULL;
                 	rv = -1;
