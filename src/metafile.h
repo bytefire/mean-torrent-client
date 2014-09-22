@@ -4,6 +4,7 @@
 #include<stdint.h>
 
 #include "bencode.h"
+#include "bf_logger.h"
 
 struct metafile_info
 {
@@ -39,7 +40,7 @@ int read_metafile(char *filename, struct metafile_info *mi)
 
 	if(!bencode_is_dict(&b1))
 	{
-		bf_log("[ERROR] read_metafile(): The metafile %s seems to be malformed.Aborting.\n");
+		bf_log("[ERROR] read_metafile(): The metafile %s seems to be malformed.Aborting.\n", filename);
 		rv = -1;
 		goto cleanup;
 	}

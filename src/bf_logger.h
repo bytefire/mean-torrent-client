@@ -1,3 +1,8 @@
+#ifndef BF_LOGGER_H
+#define BF_LOGGER_H
+
+#pragma once
+
 #include<stdio.h>
 #include<stdlib.h>
 #include<stdarg.h>
@@ -115,3 +120,5 @@ void bf_logger_end()
 	bf_log("\nEnd of log file.\n");
 	logfn = NULL;
 }
+
+#endif // BF_LOGGER_H

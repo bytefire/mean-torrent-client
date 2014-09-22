@@ -22,17 +22,9 @@ int peers_extract_from_file(char *filename, struct peer **head)
 	FILE *fp;
 	int len;
 	char *contents;
-	int rv;
+	int rv = 0;
 	
-	rv = 0;	
-	// TODO: this file reading functionality should go in <proj-name>utils.h
-	fp = fopen(filename, "r");
-	fseek(fp, 0L, SEEK_END);
-	len = ftell(fp);
-	fseek(fp, 0L, SEEK_SET);
-	contents = malloc(len);
-	len = fread(contents, 1, len, fp);
-	fclose(fp);
+	util_read_whole_file(filename, &contents, &len);
 	rv = peers_extract(contents, len, head);
 	free(contents);
 
