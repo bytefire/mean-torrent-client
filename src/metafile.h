@@ -27,7 +27,7 @@ int read_metafile(char *filename, struct metafile_info *mi)
 {
 	FILE *fp;
 	int len, rv;
-	char *contents;
+	char *contents = NULL;
 	const char *str;
 	bencode_t b1, b2, b3; // bn where n represents level of nestedness
 
@@ -36,7 +36,13 @@ int read_metafile(char *filename, struct metafile_info *mi)
 	util_read_whole_file(filename, &contents, &len);
 
 	bencode_init(&b1, contents, len);
-	// TODO: check if this is not a dictionary
+
+	if(!bencode_is_dict(&b1))
+	{
+		bf_log("[ERROR] read_metafile(): The metafile %s seems to be malformed.Aborting.\n");
+		rv = -1;
+		goto cleanup;
+	}
 
 	// announce
 	bencode_dict_get_next(&b1, &b2, &str, &len);
@@ -132,7 +138,11 @@ int read_metafile(char *filename, struct metafile_info *mi)
 	memcpy((char *)(mi->pieces), str, len);
 
 cleanup:
-	free(contents);
+	if(contents)
+	{
+		free(contents);
+	}
+
 	return rv;
 }
 
