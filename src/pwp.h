@@ -51,7 +51,7 @@
 
 struct pwp_peer
 {
-        uint8_t peer_id[20]; // TODO: should this be uint8_t peer_id[20]?
+        uint8_t peer_id[20];
         int unchoked;
 	int has_pieces;
 };
