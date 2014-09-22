@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
 			return -1;
 		}
 	}	
-	// TODO: implement following method.
+
 	filename = util_extract_filename(path_to_torrent);
 	// check if folder with the same name as filename exists. if not then create one.
 	if(stat(filename, &s) == -1)
@@ -263,7 +263,7 @@ int generate_metadata_file(char *announce_filename, struct metafile_info *mi, ch
 	int rv = 0;
 	uint8_t *announce_data = NULL;
 	int len;
-	uint8_t *info_hash = NULL;
+	uint8_t info_hash[20];
 	uint8_t our_peer_id[20];
 	char *peer_id_hex = PEER_ID_HEX;
 
@@ -273,9 +273,8 @@ int generate_metadata_file(char *announce_filename, struct metafile_info *mi, ch
 		rv = -1;
 		goto cleanup;
         }
-	// TODO: sha1_compute() should take in a 20-byte array rather than malloc a new one every time!
-	//	that way the caller can decide whether it wants to allocate the 20 bytes on stack or heap.
-        info_hash = sha1_compute(mi->info_val, mi->info_len);
+	
+        sha1_compute(mi->info_val, mi->info_len, info_hash);
         if(util_hex_to_ba(peer_id_hex, our_peer_id) != 0)
 	{
 		bf_log("[ERROR] generate_metadata_file(): Failed during call to util_hex_to_ba().\n");
@@ -287,10 +286,6 @@ cleanup:
 	if(announce_data)
 	{
 		free(announce_data);
-	}
-	if(info_hash)
-	{
-		free(info_hash);
 	}
 
 	return rv;
@@ -336,7 +331,7 @@ char *make_tracker_http_request(char *request, int *len)
 
 int parse_torrent_file(char *torrent_filename, struct metafile_info *mi, char *hash)
 {
-	uint8_t *sha1;
+	uint8_t sha1[20];
 	int i;
 
 	if(read_metafile(torrent_filename, mi) != 0)
@@ -348,7 +343,7 @@ int parse_torrent_file(char *torrent_filename, struct metafile_info *mi, char *h
         metafile_print(mi);
 
         printf("\nSHA1 of info dictionary: ");
-        sha1 = sha1_compute(mi->info_val, mi->info_len);
+        sha1_compute(mi->info_val, mi->info_len, sha1);
 	
 	for(i=0; i<20; i++)
         {
@@ -358,7 +353,6 @@ int parse_torrent_file(char *torrent_filename, struct metafile_info *mi, char *h
 
 	printf("%s\n", hash);
 	
-	free(sha1);
 	return 0;
 }
 

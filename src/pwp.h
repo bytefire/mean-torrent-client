@@ -1156,7 +1156,8 @@ int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer)
                 goto cleanup;
 	}
 	
-	uint8_t *piece_hash = sha1_compute(piece_data, g_pieces[idx].piece_length);
+	uint8_t piece_hash[20];
+	sha1_compute(piece_data, g_pieces[idx].piece_length, piece_hash);
 
 	// compute the index of first byte of the actual piece hash inside the global piece hashes string
 	i = idx * 20;
@@ -1170,18 +1171,13 @@ int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer)
 			bf_log("\n");
 			bf_log_binary("  > Actual piece hash: ", actual_sha1, 20);
 			bf_log("\n");
-			free(piece_hash);
-        	        piece_hash = NULL;
-                	rv = -1;
+			rv = -1;
                 	goto cleanup;
 		}
 	}
 
 	bf_log("[LOG] download_piece(): Successfulle verified SHA1 of piece at index %d.\n", idx);
 	rv = 0;
-
-	free(piece_hash);
-	piece_hash = NULL;	
 
         bf_log("[LOG] *-*-*-*- Downloaded piece!! Piece index: %d.\n", idx);
 

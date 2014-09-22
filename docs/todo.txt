@@ -1,9 +1,7 @@
 12. inside bf_logger print date in compact format.
 18. in sha1_compute() method, instead of allocating a 20 bytes for sha1 hash, this method should take in pre-allocated 20-byte array and just populate it.
 19. log file path in client.c is hard coded absolute path. that is because we change working directory when we enter the loff/ folder so we can't use relative path. one solution is to obtain absolute path to log file by using the relative path and then use that path (preferred). alternatively we can not change the working directory at all so working directory always remains the same. then we can use the relative path.
-(done) 20. IMPORTANT: in pwp_start() when initialising data from resume file, update the g_downloaded_pieces counter. caveate is when we download only 3 pieces...
 21. in pwp.h, PIECE_STATUS_AVAILABLE etc should be enums.
-22. (done) IMPORTANT: make_tracker_http_request() method in client.c should also return output.size. the calling method should use that size to write to file rather than doing strlen.
 ---------------------------------
 
 > total size of the file is not exact multiple of piece size. so the last piece is not the same size as others. we need to find the size from torrent file or announce file and then create saved file accordingly. we also need to look for the correct block numbers and not those outside the limit. should we save piece size with each struct that represents a piece in pwp.h file?
@@ -14,6 +12,7 @@
 - (done) test that download starts fine.
 - (done) test complete file download.
 - test that last few pieces are downloaded without a problem.
+*** all pieces downloaded and verified successfully. logs show "freeing g_pieces" as the last statement. program aborted with a memory error saying same memory was being freed twice.
 
 long-term:
 ==========

@@ -147,14 +147,12 @@ void process_block(uint8_t *M)
 }
 
 // uses the method described here: https://tools.ietf.org/html/rfc3174#section-6.1 
-uint8_t *sha1_compute(uint8_t *msg, int msg_len)
+void sha1_compute(uint8_t *msg, int msg_len, uint8_t *sha1)
 {
 	// pad msg
 	int pad_len, i;
 	uint8_t *padded;
 
-// TODO: instead of allocating the 20 bytes, this method should taken in a pre-allocated 20-byte array and just populate it.
-	uint8_t *sha1 = malloc(20);
 	uint8_t *temp;
 
 	_h0 = H0; _h1 = H1; _h2 = H2; _h3 = H3; _h4 = H4;
