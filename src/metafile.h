@@ -33,14 +33,7 @@ int read_metafile(char *filename, struct metafile_info *mi)
 
 	rv = 0;
 	
-	// TODO: use util_read_whole_file method in util.h
-	fp = fopen(filename, "r");
-	fseek(fp, 0L, SEEK_END);
-	len = ftell(fp);
-	fseek(fp, 0L, SEEK_SET);
-	contents = malloc(len);
-	len = fread(contents, 1, len, fp);
-	fclose(fp);
+	util_read_whole_file(filename, &contents, &len);
 
 	bencode_init(&b1, contents, len);
 	// TODO: check if this is not a dictionary

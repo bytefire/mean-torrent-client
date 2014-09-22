@@ -325,7 +325,7 @@ char *make_tracker_http_request(char *request, int *len)
         curl_easy_cleanup(my_handle);	
 	
 	*len = output.size;
-	// TODO: memory leak here!! output.buffer needs to be freed. it is allocated in write_memory_callback method.	
+	// is this a memory leak? output.buffer is realloc'ed in write_memory_callback function but not sure if curl handles this already.
 	return output.buffer;
 }
 
@@ -381,7 +381,7 @@ char *get_first_request(char *announce_url, char *info_hash_hex, char *peer_id_h
 
 	url_encoded_info_hash[60] = '\0';
 	url_encoded_peer_id[60] = '\0';
-	// TODO: should use snprintf and also check if whole url has been copied. if not then realloc and snprintf again.
+
 	request = calloc(512, 1);
 
 	sprintf(request, request_format, announce_url, url_encoded_info_hash, url_encoded_peer_id, file_size);
