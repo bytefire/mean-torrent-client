@@ -1201,7 +1201,6 @@ int download_block(int socketfd, int expected_piece_idx, FILE *savedfp, struct p
 	FD_SET(socketfd, &recvfd);
 	msg = malloc(MAX_DATA_LEN);
 	// NOTE: cannot call receive_msg method above because piece msg will be too long to hold in memory.
-	// TODO: create separate method that handles this scenario as well as receive_msg.
 	while(msg_id != PIECE_MSG_ID)
 	{
 		bf_log("[LOG] Going to get length of message. calling receive_msg_for_len().\n");
@@ -1249,7 +1248,7 @@ int download_block(int socketfd, int expected_piece_idx, FILE *savedfp, struct p
 		}
 	}
 	bf_log("[LOG] Received PIECE message!! Going to process it now.\n");
-	// TODO: process the piece message. here len = num of data bytes in block + 4(piece idx) + 4(block offset) + 1 (for msg id) & msg_id = PIECE_MSG_ID.
+	// processing the piece message. here len = num of data bytes in block + 4(piece idx) + 4(block offset) + 1 (for msg id) & msg_id = PIECE_MSG_ID.
 	//	have a global file descriptor to the file that already has the total memory required
 	//	using piece length and idx and block offset calculate position of bytes to store inside that file
 	//	save the bytes in file and mark that block's status as BLOCK_DOWNLOADED
@@ -1302,7 +1301,7 @@ int download_block(int socketfd, int expected_piece_idx, FILE *savedfp, struct p
 			rv = RECV_ERROR;
         	        goto cleanup;
 	        }
-		// TODO: IMPORTANT, this method may not write all len bytes to the file. MUST check the value returned by fwrite here.
+		
 	        fwrite(msg, 1, len, savedfp);
 
 		remaining -= len;
@@ -1406,15 +1405,21 @@ int process_bitfield(uint8_t *msg, struct pwp_peer *peer)
                 {
                     bf_log("[ERROR] process_bitfield(): Bitfield has more bits set than there are number of pieces.\n");
                     rv = -1;
-                    // TODO: Reset all pieces that were set to available for this particular peer.
+                    //  Should we reset all pieces that were set to available for this particular peer.
                     goto cleanup;
                 }
+		
+		/* -X-X-X- CRITICAL REGION START -X-X-X- */
+                pthread_mutex_lock(&g_pieces_mutexes[idx]);
+
                 if(g_pieces[idx].status != PIECE_STATUS_COMPLETE)
                 {
                     g_pieces[idx].status = PIECE_STATUS_AVAILABLE;
-		
-		    linked_list_add(&g_pieces[idx].peers, peer);	
-                }
+		}
+		linked_list_add(&g_pieces[idx].peers, peer);
+
+		pthread_mutex_unlock(&g_pieces_mutexes[idx]);
+                /* -X-X-X- CRITICAL REGION END -X-X-X- */
             }
             mask = mask / 2;
         }
