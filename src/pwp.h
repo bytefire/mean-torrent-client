@@ -1508,7 +1508,6 @@ int choose_random_piece_idx(uint8_t *peer_id)
 
 int are_same_peers(uint8_t *peer_id1, uint8_t *peer_id2)
 {
-	// TODO: perform bounds checking
 //	bf_log("++++++++++++++++++++ START:  ARE_SAME_PEERS +++++++++++++++++++++++\n");
 
 	int rv = 1; // default: are same peers
@@ -1646,7 +1645,7 @@ int update_resume_file(const char *path_to_resume_file, int downloaded_piece_ind
 	int byte_index = downloaded_piece_index / 8;
 	uint8_t resume_byte;
 	uint8_t mask;
-// TODO: acquire lock on g_resume_mutexes[byte_index]
+
 	/*-X-X-X- START OF CRITICAL REGION  -X-X-X-*/
         bf_log("[LOG] update_resume_file(): Going to lock g_resume_mutexes[%d].\n", byte_index);
         pthread_mutex_lock(&g_resume_mutexes[byte_index]);
@@ -1654,7 +1653,7 @@ int update_resume_file(const char *path_to_resume_file, int downloaded_piece_ind
 
 	if(util_read_file_chunk(path_to_resume_file, byte_index, 1, &resume_byte) == -1)
 	{
-		// TODO: free the corresponding g_resume_mutexes here	
+		// free the corresponding g_resume_mutexes here	
 		pthread_mutex_unlock(&g_resume_mutexes[byte_index]);	
 		rv = -1;
 		bf_log("[ERROR] update_resume_file(): Failed to read the correct byte from the resume file '%s'. Released g_resume_mutexes[%d].\n", path_to_resume_file, byte_index);
@@ -1669,7 +1668,6 @@ int update_resume_file(const char *path_to_resume_file, int downloaded_piece_ind
 	fclose(resumefp);
 	resumefp = NULL;
 
-// TODO: release lock on g_resume_mutexes[byte_index]
 	bf_log("[LOG] Going to release g_resume_mutexes[%d].\n", byte_index);
 	pthread_mutex_unlock(&g_resume_mutexes[byte_index]);
 
