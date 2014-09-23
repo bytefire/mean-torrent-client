@@ -1,12 +1,9 @@
-#ifndef UTIL_H
-#define UTIL_H
-
-#pragma once
-
 #include<stdlib.h>
 #include<stdio.h>
 #include<stdint.h>
 #include<string.h>
+
+#include "util.h"
 
 #define BUF_LEN 512
 
@@ -252,5 +249,3 @@ int util_write_new_file(char *filename, uint8_t *contents, int len)
 	
 	return 0;
 }
-
-#endif // UTIL_H
