@@ -17,12 +17,15 @@ pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
 
 void print_time(FILE *fp)
 {
-	// TODO: find a way to print date in compact format. 
-	time_t timer;
-	time(&timer);
-	char *timestr = ctime(&timer);
-	timestr[strlen(timestr) - 2] = '\0'; // remove the \n
-	fprintf(fp, "[%s] ", timestr);
+	time_t rawtime;
+	struct tm *timeinfo;
+	char timestr[70];
+
+	time(&rawtime);
+	timeinfo = localtime(&rawtime);
+	strftime(timestr, sizeof(timestr), "[\%F %T]", timeinfo);
+
+	fprintf(fp, "%s", timestr);
 }
 
 void print_thread_id(FILE *fp)
