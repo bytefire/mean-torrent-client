@@ -606,7 +606,6 @@ void *talk_to_peer(void *args)
 	/******** RECEIVE RESPONSE TO INTERESTED *************/
 	while(!peer_status.unchoked)
 	{
-		// TODO: refactor this set of lines into it's own method. it's repeated whenever we want to receive messages.
 		rv = receive_msg(socketfd, &recvfd, &recvd_msg, &len);
 		bf_log("[LOG] rv from receive_msg: %d.\n", rv);
         	if(rv == RECV_ERROR)
@@ -631,7 +630,6 @@ void *talk_to_peer(void *args)
 	rv = 0;
 	bf_log("[LOG] Peer has unchoked us.\n");	
 	// if here then pieces must be populated and we're unchoked too.
-	// TODO: start requesting pieces	
 	rv = get_pieces(socketfd, &peer_status);
 
 cleanup:
@@ -761,7 +759,7 @@ int receive_msg_for_len(int socketfd, fd_set *recvfd, int len, uint8_t *msg)
 
 	tv.tv_sec = 10;
         tv.tv_usec = 0;
-        // TODO: the for-loop to keep receiving until we have received the 4 bytes which specify length.
+        
         rv = select(socketfd + 1, recvfd, NULL, NULL, &tv);
         bf_log("[LOG] receive_msg_for_len: value of 'rv' after select: %d (1=OK; 0=timeout; -1=error)\n", rv);
 
@@ -887,7 +885,6 @@ int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 		switch(extract_msg_id(temp))
 		{
 			case BITFIELD_MSG_ID:
-				// TODO: populate global stats collection
 				bf_log("*-*-* Got BITFIELD message.\n");
 				process_bitfield(temp, peer);
 				peer->has_pieces = 1;
@@ -936,7 +933,6 @@ int process_msgs(uint8_t *msgs, int len, int has_hs, struct pwp_peer *peer)
 				goto cleanup;
 		}
 
-		// TODO: Move curr to next message and update len accordingly.
 		jump = ntohl(*((int *)curr)) + 4;
 		curr += jump;
 		len = len - jump;
@@ -984,7 +980,6 @@ int get_pieces(int socketfd, struct pwp_peer *peer)
 
 		if(rv == 0)
 		{
-			// TODO: call update_resume_file method here...
 			rv = update_resume_file(g_resume_filepath, idx);
 			if(rv == 0)
 			{
@@ -1058,7 +1053,7 @@ cleanup:
 int download_piece(int idx, int socketfd, FILE *savedfp, struct pwp_peer *peer)
 {
 	bf_log("++++++++++++++++++++ START:  DOWNLOAD_PIECE +++++++++++++++++++++++\n");
-    /* TODO:
+    /* Steps:
     1. Calculate number of blocks in this piece (2^14 (16384) bytes per block )
     2. malloc an array 'blocks' of struct pwp_block for this piece 
     3. initialise each pwp_block in the blocks array
