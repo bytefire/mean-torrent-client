@@ -42,9 +42,14 @@ int peers_extract(char *contents, int len, struct peer **head)
 	bencode_init(&b1, contents, len);
 
 	// keep going until we hit the key 'peers'
-	while(1) // TODO: what if there is no key named 'peers'?
+	while(1)
 	{
-		bencode_dict_get_next(&b1, &b2, &str, &len);
+		if(!bencode_dict_get_next(&b1, &b2, &str, &len))
+		{
+			bf_log("[ERROR] peers_extract(): The bencoded dictionary doesn't contain the key 'peers'. Aborting.\n");
+			rv = -1;
+			goto cleanup;
+		}
 		if(strncmp(str, "peers", 5) == 0)
 		{
 			break;
