@@ -1,4 +1,4 @@
-bit-torrent-client
+mean-torrent-client
 ==================
 
-BitTorrent client in C (under construction)
+A selfish BitTorrent client in C (under construction)
