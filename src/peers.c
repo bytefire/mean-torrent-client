@@ -3,20 +3,10 @@
 #include<string.h>
 #include<stdint.h>
 
+#include "peers.h"
+
 #include "bencode.h"
 #include "bf_logger.h"
-
-// #define METADATA_FILE "../files/loff.metadata"
-
-struct peer
-{
-	uint8_t ip[4];
-	uint16_t port;
-	
-	struct peer *next;
-};
-
-int peers_extract(char *contents, int len, struct peer **head);
 
 int peers_extract_from_file(char *filename, struct peer **head)
 {
