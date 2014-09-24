@@ -3,6 +3,8 @@
 #include<string.h>
 #include<curl/curl.h>
 #include<curl/easy.h>
+#include<sys/stat.h>
+#include<sys/types.h>
 
 #include "metafile.h"
 #include "sha1.h"

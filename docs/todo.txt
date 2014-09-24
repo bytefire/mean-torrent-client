@@ -2,6 +2,8 @@
 2. in pwp.h, PIECE_STATUS_AVAILABLE etc should be enums.
 ---------------------------------
 
+>>> currently on headers/pwp.h -> just added #ifndef bit.
+
 long-term:
 ==========
 
