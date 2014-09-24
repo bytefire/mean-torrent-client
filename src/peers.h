@@ -4,6 +4,7 @@
 #include<stdint.h>
 
 #include "bencode.h"
+#include "bf_logger.h"
 
 // #define METADATA_FILE "../files/loff.metadata"
 

@@ -3,26 +3,10 @@
 #include<string.h>
 #include<stdint.h>
 
+#include "metafile.h"
+
 #include "bencode.h"
 #include "bf_logger.h"
-
-struct metafile_info
-{
-	char *announce_url;
-	char *file_name; // filename with path
-	char md5[32];
-	char *top_most_directory; // the 'name' field in info dictionary
-	long int length;
-	long int piece_length;
-	long int num_of_pieces;
-	char *pieces;
-	int info_len;
-	uint8_t *info_val;
-};
-
-// void split_sha1s(char *sha1_str, int len, struct metafile_info *mi);
-
-int parse_multiple_files(bencode_t *files_list, struct metafile_info *mi);
 
 int read_metafile(char *filename, struct metafile_info *mi)
 {
@@ -147,31 +131,6 @@ cleanup:
 	return rv;
 }
 
-/*
-// len param is needed because if we do strlen then we can hit a null character in middle of sha1_str which is a
-// binray string
-void split_sha1s(char *sha1_str, int len, struct metafile_info *mi)
-{
-	char (*temp)[20];
-	char *input;
-	int i, count;
-
-	//len = strlen(sha1_str);
-	count = len / 20;
-	(*mi).num_of_pieces = count;
-	
-	// this is same as len. but this way it makes the intent clear.
-	(*mi).pieces = calloc(sizeof(char[21]), count);
-	temp = (*mi).pieces;
-	input = sha1_str;
-	for(i=0; i<len; i+=20)
-	{
-		memcpy(*temp, input, 20);
-		temp += 1;
-		input += 20;
-	}
-}
-*/
 
 int parse_multiple_files(bencode_t *files_list, struct metafile_info *mi)
 {
@@ -223,17 +182,7 @@ void metafile_print(struct metafile_info *mi)
 	printf("Length: %ld\n", mi->length);
 	printf("Piece length: %ld\n", mi->piece_length);
 	printf("Number of pieces: %ld\n", mi->num_of_pieces);
-	printf("Pieces:\n");
-	
-	/*
-	temp = (*mi).pieces;
-
-	for(i=0; i<(*mi).num_of_pieces; i++)
-	{
-		printf("  %d) %s\n", i, *temp);
-		temp += 1;
-	}
-	*/
+	printf("Pieces:\n");	
 }
 
 void metafile_free(struct metafile_info *mi)
