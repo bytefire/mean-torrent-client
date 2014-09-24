@@ -8,6 +8,7 @@
 #include<string.h>
 #include<stdint.h>
 
+#include "sha1.h"
 
 uint32_t H0 = 0x67452301;
 uint32_t H1 = 0xEFCDAB89;
