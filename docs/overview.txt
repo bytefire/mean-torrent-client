@@ -5,7 +5,7 @@ OVERVIEW OF BIT-TORRENT CLIENT
 
 2. Announce File ---(peers_create_metadata)--> Metadata File
 
-3. pwp.h uses that metadata file only to download the torrent. Metadata file is in our own format and not a standard format.
+3. pwp.h uses that metadata file to download the torrent. Metadata file is in our own format and not a standard format.
 
 
 Format of Metadata File:
