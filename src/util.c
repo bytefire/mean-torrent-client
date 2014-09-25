@@ -7,7 +7,7 @@
 
 #define BUF_LEN 512
 
-int util_read_whole_file(char *filename, uint8_t **contents, int *file_len)
+int util_read_whole_file(const char *filename, uint8_t **contents, int *file_len)
 {
         FILE *fp;
 	int len;
@@ -106,7 +106,7 @@ int util_create_file_of_size(const char *file_name, long bytes)
 	return 0;
 }
 
-int util_read_file_chunk(char *filename, int start_idx, int chunk_len,  uint8_t *contents)
+int util_read_file_chunk(const char *filename, int start_idx, int chunk_len,  uint8_t *contents)
 {
         FILE *fp;
         int len = chunk_len;

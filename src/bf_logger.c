@@ -28,7 +28,7 @@ void print_time(FILE *fp)
 void print_thread_id(FILE *fp)
 {
         pthread_t thread_id = pthread_self();
-        fprintf(fp, "[TID: %d] ", thread_id);
+        fprintf(fp, "[TID: %d] ", (int)thread_id);
 }
 
 void bf_logger_init(char *filename)
