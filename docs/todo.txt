@@ -22,7 +22,13 @@ Once you have generated the executable `mtc` by compiling the code, you can down
 2. Copy that torrent file into the `bin` folder where the `mtc` executable is. 
 3. On command line, go into the `bin` folder and type this: `mtc path/to/torrent/file`. 
 
-This will start downloading the file into a new folder whose name will correspond the name of torrent file.
+This will start downloading the file into a new folder whose name will correspond the name of torrent file. That file will have the extension ".saved".
+
+You can also specify a second argument after `path/to/torrent/file`. This is the mode. There are two modes: `fresh` and `new`. 
+
+*fresh* is when you want to resume downloading the file which wasn't fully downloaded the last time mtc was run, but this time you want mtc to retreive a fresh list of peers from the tracker. If you want to resume downloading without getting a fresh list of peers then just don't provide a mode argument.
+
+*new* is when you have an incomplete download from last time but you want to completely delete any of previously downloaded pieces and start all over again. In new mode, as in fresh mode, mtc will get a fresh list of peers from the tracker.
 
 For details of how it works, read Overview.txt in `docs` folder.
 

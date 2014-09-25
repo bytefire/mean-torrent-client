@@ -1,12 +1,29 @@
 OVERVIEW OF BIT-TORRENT CLIENT
 ==============================
 
+Starting point in code is mtc.c. This is what mtc does when you run it.
+
+1. Download announce file using announce URL in the torrent file.
+2. Using the information in torrent and announce files, it creates a metadata file.
+3. It creates a resume file if it isn't already there. It also creates a saved file if it isn't already there.
+4. It calls pwp_start() method which makes use of the metadata, resume and saved files to download pieces belonging to the file to be downloaded. In pwp_start(), exactly one thread talks to one peer and there are a maximum of four peer threads running at any time. The maximum number of peer threads is configurable in code.
+
 1. Torrent File ---(HTTP Request)--> Tracker ---(HTTP Response)--> Announce File
 
 2. Announce File ---(peers_create_metadata)--> Metadata File
 
-3. pwp.h uses that metadata file to download the torrent. Metadata file is in our own format and not a standard format.
+3. pwp.h uses that metadata file, along with others, to download the torrent. Metadata file is in our own format and not a standard format.
 
+Files
+-----
+
+mtc creates three files as part of its exection. They have extensions .metadata, .resume and .saved.
+
+metadata file: This contains essential data derived from .torrent and announce files that mtc uses to download the file.
+
+resume file: This contains just a bitfield which represents which pieces have been successfully downloaded. The most significant bit represents the first piece. The last byte in the bitfield may contain extra bits if the number of pieces isn't an exact multiple of 8. Those extra bits will always be zero.
+
+saved file: This is the file that will contain pieces of the file being downloaded.
 
 Format of Metadata File:
 ------------------------
