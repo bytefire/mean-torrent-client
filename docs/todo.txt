@@ -1,8 +1,5 @@
-1. log file path in client.c is hard coded absolute path. that is because we change working directory when we enter the loff/ folder so we can't use relative path. one solution is to obtain absolute path to log file by using the relative path and then use that path (preferred). alternatively we can not change the working directory at all so working directory always remains the same. then we can use the relative path.
-2. in pwp.h, PIECE_STATUS_AVAILABLE etc should be enums.
+1. in pwp.h, PIECE_STATUS_AVAILABLE etc should be enums.
 ---------------------------------
-
->>> currently on headers/pwp.h -> just added #ifndef bit.
 
 long-term:
 ==========
@@ -10,7 +7,7 @@ long-term:
 1. (done) download one complete file
 2. (done) test ability to resume download
 3. (done) make sure download works fine.
-4. separate code into header and code files.
+4. (done) separate code into header and code files.
 5. (done) complete all todo's.
 6. complete the two points above.
 6. remove all warnings.

@@ -15,7 +15,7 @@
 #define PEER_ID_HEX "dd0e76bcc7f711e3af893c77e686ca85b8f12e24";
 /*********************************************************************/
 
-#define LOG_FILE "/home/bytefire/programming/code/mean-torrent-client/src/bin/logs/client.log"
+#define LOG_FILE "logs/client.log"
 #define USAGE_MESSAGE "Usage: client <path-to-torrent-file> {fresh|new}\n"
 
 #define MODE_DEFAULT 0
@@ -49,8 +49,10 @@ int main(int argc, char *argv[])
 	struct stat s;
 	int rv = 0;
 	int torrent_already_present = 1;
+	char absolute_path[100];
 
-	bf_logger_init(LOG_FILE);
+	realpath(LOG_FILE, absolute_path);
+	bf_logger_init(absolute_path);
 
 	bf_log("[LOG] The Mean Torrent Client has started.\n");
 
