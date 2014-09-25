@@ -2,4 +2,5 @@ files/
 src/tests/
 src/bin/
 
-src/cscope.out
+cscope.out
+
