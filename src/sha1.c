@@ -1,8 +1,3 @@
-#ifndef SHA1_H
-#define SHA1_H
-
-#pragma once
-
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
@@ -181,7 +176,4 @@ void sha1_compute(uint8_t *msg, int msg_len, uint8_t *sha1)
 	memcpy(temp + 16, &_h4, 4);
 	
 	free(padded);
-	return sha1;
 }
-
-#endif // SHA1_H

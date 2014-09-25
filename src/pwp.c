@@ -65,7 +65,7 @@ pthread_mutex_t *g_pieces_mutexes = NULL;
 pthread_mutex_t *g_resume_mutexes = NULL;
 pthread_mutex_t g_downloaded_pieces_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-int pwp_start(const char *md_filepath, const char *saved_filepath, const char *resume_filepath)
+int pwp_start(char *md_filepath, char *saved_filepath, char *resume_filepath)
 {
 //	bf_logger_init(LOG_FILE);
 

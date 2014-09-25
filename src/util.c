@@ -44,7 +44,7 @@ int util_hex_to_ba(char *hex, uint8_t *ba)
     uint8_t *curr;
     int i;
       
-    if(*ba == NULL)
+    if(ba == NULL)
     {
         return -1;
     }
@@ -227,7 +227,7 @@ char *util_extract_filename(char *path)
         return filename;
 }
 
-int util_write_new_file(char *filename, uint8_t *contents, int len)
+int util_write_new_file(const char *filename, uint8_t *contents, int len)
 {
 	FILE *fp;
         fp = fopen(filename, "w");

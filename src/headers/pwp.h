@@ -76,7 +76,7 @@ int download_block(int socketfd, int expected_piece_idx, FILE *savedfp, struct p
 int initialise_pieces(struct pwp_piece *pieces, long int total_length, long int num_of_pieces, long int piece_length, const char *path_to_resume_file);
 int update_resume_file(const char *path_to_resume_file, int downloaded_piece_index);
 
-int pwp_start(const char *md_filepath, const char *saved_filepath, const char *resume_filepath);
+int pwp_start(char *md_filepath, char *saved_filepath, char *resume_filepath);
 
 int extract_next_peer(bencode_t *list_of_peers, char **ip, uint16_t *port);
 

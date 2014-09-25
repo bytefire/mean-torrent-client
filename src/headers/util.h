@@ -20,6 +20,6 @@ int util_copy_file(char *src_path, char *dest_path);
 
 char *util_extract_filename(char *path);
 
-int util_write_new_file(char *filename, uint8_t *contents, int len);
+int util_write_new_file(const char *filename, uint8_t *contents, int len);
 
 #endif // UTIL_H
