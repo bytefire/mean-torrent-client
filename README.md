@@ -1,14 +1,14 @@
 mean-torrent-client
 ===================
 
-MeanTorrent is a simple BitTorrent client. It is a command line application for Linux. At the moment it only downloads files (hence mean) and only downloads single-file torrents. Single-file torrents download just one file rather than downloading multiple files. See the Work to do section below.
+MeanTorrent is a simple BitTorrent client. It is a command line application for Linux. At the moment it only downloads files (hence "mean") and only downloads single-file torrents. Single-file torrents download just one file rather than downloading multiple files. See the Work to do section below.
 
 Compiling the code:
 ==================
 
 1. Download the code on a Linux machine. 
 2. Make sure libCurl is installed. If not, obtain it from <...>. 
-3. In command line, go into `mean-torrent-client/src` and type `make client`. This will compile the client and create a folder named `bin` inside the `mean-torrent-client\src` folder.
+3. In command line, go into `mean-torrent-client/src` and type `make`. This will compile the client and create a folder named `bin` inside the `mean-torrent-client\src` folder.
 4. Go into that `bin` folder where you will see the main executable named `mtc`. 
 
 Downloading torrent:
