@@ -37,7 +37,8 @@ Work to do
 
 1. Allow it to share files with other peers, i.e. honour the PIECE requests.
 2. Allow it do handle multi-file downloads.
-3. Implement distributed hash tables (DHT) protocol.
+3. If the whole file isn't downloaded after going through all peers then download a new announce file and download again. This is a relatively simple change as most of the code for this is already in place and working. It only needs to be connected together and then tested. 
+4. Implement distributed hash tables (DHT) protocol.
 
 Credits
 =======
