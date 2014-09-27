@@ -8,8 +8,10 @@ Compiling the code
 
 1. Download the code on a Linux machine. 
 2. Make sure libCurl is installed. If not, obtain it from . http://curl.haxx.se/download.html
-3. In command line, go into `mean-torrent-client/src` and type `make`. This will compile the client and create a folder named `bin` inside the `mean-torrent-client\src` folder.
+3. In command line, go into `mean-torrent-client/src` and type `make`. This will compile the client and create a folder named `bin` inside the `mean-torrent-client/src` folder.
 4. Go into that `bin` folder where you will see the main executable named `mtc`. 
+
+**Logging:** Logs can be found in `bin/logs/` folder. Logging is quite extensive which hinders performance as it involves disk I/O as well as lock contention as separate threads try to write to the same log file without interleaving their log statements with other threads' log statements. Turning logging off completely should greatly improve performance.
 
 Downloading torrent
 ===================
