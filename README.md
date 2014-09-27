@@ -20,7 +20,7 @@ Once you have generated the executable `mtc` by compiling the code, you can down
 2. Copy that torrent file into the `bin` folder where the `mtc` executable is. 
 3. On command line, go into the `bin` folder and type this: `./mtc path/to/torrent/file`. 
 
-This will start downloading the file into a new folder whose name will correspond the name of torrent file. That file will have the extension ".saved".
+This will start downloading the file into a new folder whose name will correspond the name of torrent file. That file will have the extension ".saved". If the whole file is not downloaded, as the resume file would indicate by not having all bits (except the extra bits in the last byte if the number of pieces is not an exact multiple of 8) being set, then run `mtc path/to/torrent/file fresh` as explained below. 
 
 You can also specify a second argument after `path/to/torrent/file`. This is the mode. There are two modes: `fresh` and `new`. 
 
