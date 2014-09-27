@@ -7,7 +7,7 @@ Compiling the code:
 ==================
 
 1. Download the code on a Linux machine. 
-2. Make sure libCurl is installed. If not, obtain it from <...>. 
+2. Make sure libCurl is installed. If not, obtain it from . http://curl.haxx.se/download.html
 3. In command line, go into `mean-torrent-client/src` and type `make`. This will compile the client and create a folder named `bin` inside the `mean-torrent-client\src` folder.
 4. Go into that `bin` folder where you will see the main executable named `mtc`. 
 
