@@ -1,7 +1,7 @@
 mean-torrent-client
 ===================
 
-MeanTorrent is a simple BitTorrent client. It is a command line application for Linux. At the moment it only downloads files (hence "mean") and only downloads single-file torrents. By single-file torrents it is meant those torrents which download just one file rather than downloading multiple files. See the *Work to do* section below.
+MeanTorrent is a simple BitTorrent client. It is a command line application for Linux. At the moment it only downloads files (hence "mean") and only downloads single-file torrents. By single-file torrents it is meant those torrents which download just one file rather than downloading multiple files. See the *Work to do* section below. For technical overview, see https://github.com/bytefire/mean-torrent-client/blob/master/docs/overview.txt.
 
 Compiling the code
 ==================
